@@ -1,0 +1,62 @@
+<Project>
+
+  <!-- Explicit SDK imports so VSSDK targets are imported AFTER Microsoft.Common.targets -->
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <RootNamespace>VsDebugBridge.VsExtension</RootNamespace>
+    <AssemblyName>VsDebugBridge.VsExtension</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+
+    <!-- VSIX packaging - tells MSBuild to produce a .vsix, not a class library -->
+    <VsixType>v3</VsixType>
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <DeployExtension Condition="'$(CI)' == 'true'">false</DeployExtension>
+    <GeneratePkgDefFile>true</GeneratePkgDefFile>
+    <UseCodebase>true</UseCodebase>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>true</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>true</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <CopyBuildOutputToOutputDirectory>true</CopyBuildOutputToOutputDirectory>
+    <CopyOutputSymbolsToOutputDirectory>true</CopyOutputSymbolsToOutputDirectory>
+    <EnableDefaultNoneItems>false</EnableDefaultNoneItems>
+
+    <!-- Debug: F5 launches VS Experimental Instance with extension installed -->
+    <StartAction>Program</StartAction>
+    <StartProgram>$(DevEnvDir)devenv.exe</StartProgram>
+    <StartArguments>/rootsuffix Exp</StartArguments>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.12.40392" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.13.2126">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers</IncludeAssets>
+    </PackageReference>
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="System.Net.Http" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\VsDebugBridge.Contracts\VsDebugBridge.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="source.extension.vsixmanifest">
+      <SubType>Designer</SubType>
+    </None>
+  </ItemGroup>
+
+  <!-- SDK targets MUST come before VSSDK targets, otherwise Microsoft.Common.targets
+       resets PrepareForRunDependsOn and wipes out GeneratePkgDef/CreateVsixContainer/DeployVsixExtensionFiles -->
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+
+  <!-- Import VSSDK targets AFTER SDK targets for VSIX packaging, deployment, and F5 debugging -->
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" />
+
+</Project>

@@ -1,0 +1,11 @@
+{
+  "profiles": {
+    "VsDebugBridge.McpServer": {
+      "commandName": "Project",
+      "applicationUrl": "http://localhost:9229",
+      "environmentVariables": {
+        "ASPNETCORE_ENVIRONMENT": "Development"
+      }
+    }
+  }
+}

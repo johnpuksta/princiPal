@@ -1,0 +1,17 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/VsDebugBridge.Contracts/VsDebugBridge.Contracts.csproj" />
+    <Project Path="src/VsDebugBridge.McpServer/VsDebugBridge.McpServer.csproj" />
+    <Project Path="src/VsDebugBridge.VsExtension/VsDebugBridge.VsExtension.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/VsDebugBridge.McpServer.Tests/VsDebugBridge.McpServer.Tests.csproj" />
+  </Folder>
+  <Folder Name="/.claude/">
+    <File Path="CLAUDE.md" />
+    <File Path=".claude/skills/start-mcp/SKILL.md" />
+    <File Path=".claude/skills/stop-mcp/SKILL.md" />
+    <File Path=".claude/skills/build-vsix/SKILL.md" />
+    <File Path=".claude/skills/debug-status/SKILL.md" />
+  </Folder>
+</Solution>
