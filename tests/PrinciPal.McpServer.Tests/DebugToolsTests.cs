@@ -476,6 +476,136 @@ public class DebugToolsTests
         Assert.Contains("No debug state available", ex.Message);
     }
 
+    // =================================================================
+    // GetBreakpointHistory
+    // =================================================================
+
+    [Fact]
+    public void GetBreakpointHistory_ThrowsMcpException_WhenNoHistory()
+    {
+        var ex = Assert.Throws<McpException>(() => _tools.GetBreakpointHistory());
+
+        Assert.Contains("No breakpoint history available", ex.Message);
+    }
+
+    [Fact]
+    public void GetBreakpointHistory_ReturnsSummary_WithMultipleSnapshots()
+    {
+        _store.Update(CreateBreakModeState(
+            location: new SourceLocation { FilePath = @"C:\src\A.cs", Line = 10, FunctionName = "MethodA", ProjectName = "P" },
+            locals: new List<LocalVariable>
+            {
+                new() { Name = "x", Type = "int", Value = "1", IsValidValue = true }
+            }));
+        _store.Update(CreateBreakModeState(
+            location: new SourceLocation { FilePath = @"C:\src\B.cs", Line = 20, FunctionName = "MethodB", ProjectName = "P" },
+            locals: new List<LocalVariable>
+            {
+                new() { Name = "a", Type = "int", Value = "1", IsValidValue = true },
+                new() { Name = "b", Type = "int", Value = "2", IsValidValue = true }
+            }));
+
+        var result = _tools.GetBreakpointHistory();
+
+        Assert.Contains("2 snapshots", result);
+        Assert.Contains("#0", result);
+        Assert.Contains("#1", result);
+        Assert.Contains("`MethodA`", result);
+        Assert.Contains("`MethodB`", result);
+        Assert.Contains("A.cs:10", result);
+        Assert.Contains("B.cs:20", result);
+        Assert.Contains("1 locals", result);
+        Assert.Contains("2 locals", result);
+    }
+
+    // =================================================================
+    // GetSnapshot
+    // =================================================================
+
+    [Fact]
+    public void GetSnapshot_ThrowsMcpException_WhenNotFound()
+    {
+        var ex = Assert.Throws<McpException>(() => _tools.GetSnapshot(999));
+
+        Assert.Contains("Snapshot #999 not found", ex.Message);
+    }
+
+    [Fact]
+    public void GetSnapshot_ReturnsFullDetail_ForValidIndex()
+    {
+        _store.Update(CreateBreakModeState(
+            location: new SourceLocation { FilePath = @"C:\src\File.cs", Line = 42, FunctionName = "DoWork", ProjectName = "App" },
+            locals: new List<LocalVariable>
+            {
+                new() { Name = "count", Type = "int", Value = "5", IsValidValue = true }
+            },
+            callStack: new List<StackFrameInfo>
+            {
+                new() { Index = 0, FunctionName = "DoWork", Module = "App.dll", Language = "C#", FilePath = @"C:\src\File.cs", Line = 42 }
+            }));
+
+        var result = _tools.GetSnapshot(0);
+
+        Assert.Contains("## Snapshot #0", result);
+        Assert.Contains("### Location", result);
+        Assert.Contains(@"C:\src\File.cs", result);
+        Assert.Contains("**Function**: DoWork", result);
+        Assert.Contains("### Local Variables", result);
+        Assert.Contains("**count** (`int`): `5`", result);
+        Assert.Contains("### Call Stack", result);
+        Assert.Contains("`DoWork`", result);
+    }
+
+    // =================================================================
+    // ExplainExecutionFlow
+    // =================================================================
+
+    [Fact]
+    public void ExplainExecutionFlow_ThrowsMcpException_WhenNoHistory()
+    {
+        var ex = Assert.Throws<McpException>(() => _tools.ExplainExecutionFlow());
+
+        Assert.Contains("No breakpoint history available", ex.Message);
+    }
+
+    [Fact]
+    public void ExplainExecutionFlow_ReturnsFormattedTrace_WithMultipleSnapshots()
+    {
+        _store.Update(CreateBreakModeState(
+            location: new SourceLocation { FilePath = @"C:\src\Start.cs", Line = 5, FunctionName = "Begin", ProjectName = "App" },
+            locals: new List<LocalVariable>
+            {
+                new() { Name = "input", Type = "string", Value = "\"hello\"", IsValidValue = true }
+            },
+            callStack: new List<StackFrameInfo>
+            {
+                new() { Index = 0, FunctionName = "Begin", Module = "App.dll", Language = "C#", FilePath = @"C:\src\Start.cs", Line = 5 }
+            }));
+        _store.Update(CreateBreakModeState(
+            location: new SourceLocation { FilePath = @"C:\src\Middle.cs", Line = 15, FunctionName = "Process", ProjectName = "App" },
+            locals: new List<LocalVariable>
+            {
+                new() { Name = "input", Type = "string", Value = "\"HELLO\"", IsValidValue = true },
+                new() { Name = "processed", Type = "bool", Value = "true", IsValidValue = true }
+            },
+            callStack: new List<StackFrameInfo>
+            {
+                new() { Index = 0, FunctionName = "Process", Module = "App.dll", Language = "C#", FilePath = @"C:\src\Middle.cs", Line = 15 },
+                new() { Index = 1, FunctionName = "Begin", Module = "App.dll", Language = "C#", FilePath = @"C:\src\Start.cs", Line = 6 }
+            }));
+
+        var result = _tools.ExplainExecutionFlow();
+
+        Assert.Contains("Execution Trace (2 breakpoints captured)", result);
+        Assert.Contains("Snapshot #0", result);
+        Assert.Contains("Snapshot #1", result);
+        Assert.Contains("`Begin()`", result);
+        Assert.Contains("`Process()`", result);
+        Assert.Contains("**input** (`string`): `\"hello\"`", result);
+        Assert.Contains("**input** (`string`): `\"HELLO\"`", result);
+        Assert.Contains("**processed** (`bool`): `true`", result);
+    }
+
     [Fact]
     public void ExplainCurrentState_ReturnsPartialContent_WhenSomeSectionsFail()
     {

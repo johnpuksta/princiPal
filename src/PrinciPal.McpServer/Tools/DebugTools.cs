@@ -224,6 +224,133 @@ public class DebugTools
     }
 
     // ------------------------------------------------------------------
+    // History tools
+    // ------------------------------------------------------------------
+
+    [McpServerTool(Name = "get_breakpoint_history", ReadOnly = true)]
+    [Description("Get a summary list of all breakpoint snapshots captured during this debug session. Each entry shows the snapshot index, timestamp, source location, and local variable count. Use get_snapshot to drill into a specific snapshot.")]
+    public string GetBreakpointHistory()
+    {
+        var history = _store.GetHistory();
+        if (history.Count == 0)
+            throw new McpException("No breakpoint history available. Hit some breakpoints first — each break-mode stop is recorded automatically.");
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"## Breakpoint History ({history.Count} snapshots)");
+        sb.AppendLine();
+
+        foreach (var snapshot in history)
+        {
+            var loc = snapshot.State.CurrentLocation;
+            var file = loc != null ? Path.GetFileName(loc.FilePath) : "unknown";
+            var line = loc?.Line ?? 0;
+            var func = loc?.FunctionName ?? "unknown";
+            var localCount = snapshot.State.Locals.Count;
+            var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
+
+            sb.AppendLine($"- **#{snapshot.Index}** [{time}] `{func}` at {file}:{line} ({localCount} locals)");
+        }
+
+        return sb.ToString();
+    }
+
+    [McpServerTool(Name = "get_snapshot", ReadOnly = true)]
+    [Description("Get the full debug state for a specific breakpoint snapshot by its index number. Returns locals, call stack, and source location captured at that breakpoint hit. Use get_breakpoint_history first to see available snapshot indices.")]
+    public string GetSnapshot(
+        [Description("The snapshot index number from get_breakpoint_history")]
+        int index)
+    {
+        var snapshot = _store.GetSnapshot(index);
+        if (snapshot is null)
+            throw new McpException($"Snapshot #{index} not found. Use get_breakpoint_history to see available snapshots.");
+
+        var state = snapshot.State;
+        var sb = new StringBuilder();
+        sb.AppendLine($"## Snapshot #{snapshot.Index}");
+        sb.AppendLine($"**Captured**: {snapshot.CapturedAt:HH:mm:ss.fff} UTC");
+        sb.AppendLine();
+
+        if (state.CurrentLocation is not null)
+        {
+            sb.AppendLine("### Location");
+            sb.AppendLine($"- **File**: {state.CurrentLocation.FilePath}");
+            sb.AppendLine($"- **Line**: {state.CurrentLocation.Line}");
+            sb.AppendLine($"- **Function**: {state.CurrentLocation.FunctionName}");
+            sb.AppendLine($"- **Project**: {state.CurrentLocation.ProjectName}");
+            sb.AppendLine();
+        }
+
+        if (state.Locals.Count > 0)
+        {
+            sb.AppendLine("### Local Variables");
+            FormatVariables(sb, state.Locals, indent: 0);
+            sb.AppendLine();
+        }
+
+        if (state.CallStack.Count > 0)
+        {
+            sb.AppendLine("### Call Stack");
+            foreach (var frame in state.CallStack)
+            {
+                var location = !string.IsNullOrEmpty(frame.FilePath)
+                    ? $"{frame.FilePath}:{frame.Line}"
+                    : "(external code)";
+                sb.AppendLine($"  {frame.Index}. `{frame.FunctionName}` [{frame.Language}] — {location}");
+            }
+        }
+
+        return sb.ToString();
+    }
+
+    [McpServerTool(Name = "explain_execution_flow", ReadOnly = true)]
+    [Description("Get all captured breakpoint snapshots formatted as an execution trace. Ideal for asking the AI to analyze how values change across multiple breakpoints and explain the overall program flow.")]
+    public string ExplainExecutionFlow()
+    {
+        var history = _store.GetHistory();
+        if (history.Count == 0)
+            throw new McpException("No breakpoint history available. Hit some breakpoints first — each break-mode stop is recorded automatically.");
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"## Execution Trace ({history.Count} breakpoints captured)");
+        sb.AppendLine();
+
+        foreach (var snapshot in history)
+        {
+            var state = snapshot.State;
+            var loc = state.CurrentLocation;
+            var file = loc != null ? Path.GetFileName(loc.FilePath) : "unknown";
+            var func = loc?.FunctionName ?? "unknown";
+            var line = loc?.Line ?? 0;
+            var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
+
+            sb.AppendLine($"### Snapshot #{snapshot.Index} — {file}:{line} `{func}()` at {time}");
+            sb.AppendLine();
+
+            if (state.Locals.Count > 0)
+            {
+                sb.AppendLine("**Locals:**");
+                FormatVariables(sb, state.Locals, indent: 0);
+                sb.AppendLine();
+            }
+
+            if (state.CallStack.Count > 0)
+            {
+                sb.AppendLine("**Call Stack:**");
+                foreach (var frame in state.CallStack)
+                {
+                    sb.AppendLine($"  {frame.Index}. `{frame.FunctionName}` ({frame.Module})");
+                }
+                sb.AppendLine();
+            }
+
+            sb.AppendLine("---");
+            sb.AppendLine();
+        }
+
+        return sb.ToString();
+    }
+
+    // ------------------------------------------------------------------
     // Helpers
     // ------------------------------------------------------------------
 

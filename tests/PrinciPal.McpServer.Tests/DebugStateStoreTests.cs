@@ -103,6 +103,147 @@ public class DebugStateStoreTests
         Assert.Null(_store.GetLastExpression());
     }
 
+    // =================================================================
+    // History
+    // =================================================================
+
+    [Fact]
+    public void GetHistory_ReturnsEmpty_WhenNoBreakModeUpdates()
+    {
+        _store.Update(new DebugState { IsInBreakMode = false });
+
+        Assert.Empty(_store.GetHistory());
+    }
+
+    [Fact]
+    public void Update_AppendsToHistory_WhenInBreakMode()
+    {
+        _store.Update(new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "A.cs", Line = 1, FunctionName = "A" }
+        });
+        _store.Update(new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "B.cs", Line = 2, FunctionName = "B" }
+        });
+
+        var history = _store.GetHistory();
+
+        Assert.Equal(2, history.Count);
+        Assert.Equal(0, history[0].Index);
+        Assert.Equal(1, history[1].Index);
+        Assert.Equal("A.cs", history[0].State.CurrentLocation!.FilePath);
+        Assert.Equal("B.cs", history[1].State.CurrentLocation!.FilePath);
+    }
+
+    [Fact]
+    public void Update_DoesNotAppendToHistory_WhenNotInBreakMode()
+    {
+        _store.Update(new DebugState { IsInBreakMode = true });
+        _store.Update(new DebugState { IsInBreakMode = false });
+
+        Assert.Single(_store.GetHistory());
+    }
+
+    [Fact]
+    public void Update_EvictsOldest_WhenHistoryExceedsMax()
+    {
+        _store.MaxHistorySize = 3;
+
+        for (int i = 0; i < 5; i++)
+        {
+            _store.Update(new DebugState
+            {
+                IsInBreakMode = true,
+                CurrentLocation = new SourceLocation { FilePath = $"File{i}.cs", Line = i, FunctionName = $"F{i}" }
+            });
+        }
+
+        var history = _store.GetHistory();
+
+        Assert.Equal(3, history.Count);
+        // Oldest two (index 0, 1) should be evicted; remaining are indices 2, 3, 4
+        Assert.Equal(2, history[0].Index);
+        Assert.Equal(3, history[1].Index);
+        Assert.Equal(4, history[2].Index);
+    }
+
+    [Fact]
+    public void GetSnapshot_ReturnsCorrectSnapshot_ByIndex()
+    {
+        _store.Update(new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "A.cs", Line = 10, FunctionName = "First" }
+        });
+        _store.Update(new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "B.cs", Line = 20, FunctionName = "Second" }
+        });
+
+        var snapshot = _store.GetSnapshot(1);
+
+        Assert.NotNull(snapshot);
+        Assert.Equal("B.cs", snapshot.State.CurrentLocation!.FilePath);
+        Assert.Equal("Second", snapshot.State.CurrentLocation.FunctionName);
+    }
+
+    [Fact]
+    public void GetSnapshot_ReturnsNull_ForNonexistentIndex()
+    {
+        Assert.Null(_store.GetSnapshot(999));
+    }
+
+    [Fact]
+    public void ClearHistory_ClearsOnlyHistory_KeepsCurrentState()
+    {
+        _store.Update(new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "A.cs", Line = 1, FunctionName = "A" }
+        });
+        _store.UpdateExpression(new ExpressionResult { Expression = "x", Value = "1", Type = "int", IsValid = true });
+
+        _store.ClearHistory();
+
+        Assert.Empty(_store.GetHistory());
+        Assert.NotNull(_store.GetCurrentState());
+        Assert.NotNull(_store.GetLastExpression());
+    }
+
+    [Fact]
+    public void Clear_AlsoClearsHistory()
+    {
+        _store.Update(new DebugState { IsInBreakMode = true });
+        _store.Update(new DebugState { IsInBreakMode = true });
+
+        _store.Clear();
+
+        Assert.Empty(_store.GetHistory());
+        Assert.Null(_store.GetCurrentState());
+    }
+
+    [Fact]
+    public void ClearHistory_ResetsIndexCounter()
+    {
+        _store.Update(new DebugState { IsInBreakMode = true });
+        _store.Update(new DebugState { IsInBreakMode = true });
+        _store.ClearHistory();
+
+        _store.Update(new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "New.cs", Line = 1, FunctionName = "New" }
+        });
+
+        var history = _store.GetHistory();
+        Assert.Single(history);
+        Assert.Equal(0, history[0].Index);
+    }
+
     [Fact]
     public async Task ConcurrentReadsAndWrites_DoNotThrow()
     {

@@ -143,6 +143,66 @@ public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Pro
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
     }
 
+    // =================================================================
+    // GET /api/debug-state/history
+    // =================================================================
+
+    [Fact]
+    public async Task GetHistory_ReturnsOk_WithEmptyList_WhenNoState()
+    {
+        var response = await _client.GetAsync("/api/debug-state/history");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        Assert.Contains("[]", content);
+    }
+
+    [Fact]
+    public async Task GetHistory_ReturnsSnapshots_AfterBreakModeUpdates()
+    {
+        var state = new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation
+            {
+                FilePath = @"C:\src\Test.cs",
+                Line = 10,
+                FunctionName = "TestMethod",
+                ProjectName = "TestApp"
+            }
+        };
+
+        await _client.PostAsJsonAsync("/api/debug-state", state);
+        var response = await _client.GetAsync("/api/debug-state/history");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var content = await response.Content.ReadAsStringAsync();
+        // Response is a JSON array with at least one snapshot containing our function name
+        Assert.StartsWith("[{", content);
+        Assert.Contains("TestMethod", content);
+    }
+
+    // =================================================================
+    // DELETE /api/debug-state/history
+    // =================================================================
+
+    [Fact]
+    public async Task DeleteHistory_ReturnsOk_AndClearsHistory()
+    {
+        await _client.PostAsJsonAsync("/api/debug-state", new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "A.cs", Line = 1, FunctionName = "A", ProjectName = "P" }
+        });
+
+        var deleteResponse = await _client.DeleteAsync("/api/debug-state/history");
+        Assert.Equal(HttpStatusCode.OK, deleteResponse.StatusCode);
+
+        var historyResponse = await _client.GetAsync("/api/debug-state/history");
+        var content = await historyResponse.Content.ReadAsStringAsync();
+        Assert.Contains("[]", content);
+    }
+
     [Fact]
     public async Task PostExpression_ReturnsOk_ForInvalidExpression()
     {

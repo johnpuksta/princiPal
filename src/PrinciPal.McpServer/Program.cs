@@ -36,6 +36,17 @@ app.MapDelete("/api/debug-state", (DebugStateStore store) =>
     return Results.Ok();
 });
 
+app.MapGet("/api/debug-state/history", (DebugStateStore store) =>
+{
+    return Results.Ok(store.GetHistory());
+});
+
+app.MapDelete("/api/debug-state/history", (DebugStateStore store) =>
+{
+    store.ClearHistory();
+    return Results.Ok();
+});
+
 app.MapGet("/api/health", () => Results.Ok(new { status = "running" }));
 
 // MCP endpoint (SSE transport)
