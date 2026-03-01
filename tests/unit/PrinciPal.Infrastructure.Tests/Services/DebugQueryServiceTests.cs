@@ -1,4 +1,4 @@
-using PrinciPal.Domain.Entities;
+using PrinciPal.Application.Abstractions;
 using PrinciPal.Domain.ValueObjects;
 using PrinciPal.Infrastructure.Services;
 
@@ -7,7 +7,7 @@ namespace PrinciPal.Infrastructure.Tests.Services;
 public class DebugQueryServiceTests
 {
     private readonly SessionManager _sessionManager = new();
-    private readonly DebugStateStore _store;
+    private readonly IDebugStateStore _store;
     private readonly DebugQueryService _service;
 
     private const string TestSessionId = "a1b2c3d4";

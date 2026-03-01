@@ -5,13 +5,12 @@ using PrinciPal.Domain.ValueObjects;
 namespace PrinciPal.Domain.Entities;
 
 /// <summary>
-/// Thread-safe in-memory store for the latest debug state pushed from the
-/// Visual Studio extension. The VSIX POSTs state here; MCP tools read it.
-/// Also maintains a capped history of breakpoint snapshots for multi-breakpoint analysis.
+/// Pure domain model for debug state storage. Handles capped history,
+/// eviction, and snapshotting. Not thread-safe — wrap in a thread-safe
+/// decorator for concurrent access.
 /// </summary>
 public class DebugStateStore
 {
-    private readonly object _lock = new();
     private DebugState? _currentState;
     private ExpressionResult? _lastExpression;
     private readonly List<DebugStateSnapshot> _history = new();
@@ -27,54 +26,42 @@ public class DebugStateStore
     /// Total number of snapshots ever captured (including evicted ones).
     /// Use to distinguish evicted snapshots from never-existed ones.
     /// </summary>
-    public int TotalCaptured { get { lock (_lock) { return _nextIndex; } } }
+    public int TotalCaptured => _nextIndex;
 
     public void Update(DebugState state)
     {
-        lock (_lock)
+        _currentState = state;
+
+        // Only snapshot break-mode states (actual breakpoint hits)
+        if (state.IsInBreakMode)
         {
-            _currentState = state;
-
-            // Only snapshot break-mode states (actual breakpoint hits)
-            if (state.IsInBreakMode)
+            if (_history.Count >= MaxHistorySize)
             {
-                if (_history.Count >= MaxHistorySize)
-                {
-                    _history.RemoveAt(0);
-                }
-
-                _history.Add(new DebugStateSnapshot
-                {
-                    Index = _nextIndex++,
-                    CapturedAt = DateTime.UtcNow,
-                    State = state
-                });
+                _history.RemoveAt(0);
             }
+
+            _history.Add(new DebugStateSnapshot
+            {
+                Index = _nextIndex++,
+                CapturedAt = DateTime.UtcNow,
+                State = state
+            });
         }
     }
 
     public void UpdateExpression(ExpressionResult result)
     {
-        lock (_lock)
-        {
-            _lastExpression = result;
-        }
+        _lastExpression = result;
     }
 
     public DebugState? GetCurrentState()
     {
-        lock (_lock)
-        {
-            return _currentState;
-        }
+        return _currentState;
     }
 
     public ExpressionResult? GetLastExpression()
     {
-        lock (_lock)
-        {
-            return _lastExpression;
-        }
+        return _lastExpression;
     }
 
     /// <summary>
@@ -82,10 +69,7 @@ public class DebugStateStore
     /// </summary>
     public List<DebugStateSnapshot> GetHistory()
     {
-        lock (_lock)
-        {
-            return new List<DebugStateSnapshot>(_history);
-        }
+        return new List<DebugStateSnapshot>(_history);
     }
 
     /// <summary>
@@ -93,10 +77,7 @@ public class DebugStateStore
     /// </summary>
     public DebugStateSnapshot? GetSnapshot(int index)
     {
-        lock (_lock)
-        {
-            return _history.Find(s => s.Index == index);
-        }
+        return _history.Find(s => s.Index == index);
     }
 
     /// <summary>
@@ -104,13 +85,10 @@ public class DebugStateStore
     /// </summary>
     public void Clear()
     {
-        lock (_lock)
-        {
-            _currentState = null;
-            _lastExpression = null;
-            _history.Clear();
-            _nextIndex = 0;
-        }
+        _currentState = null;
+        _lastExpression = null;
+        _history.Clear();
+        _nextIndex = 0;
     }
 
     /// <summary>
@@ -118,10 +96,7 @@ public class DebugStateStore
     /// </summary>
     public void ClearHistory()
     {
-        lock (_lock)
-        {
-            _history.Clear();
-            _nextIndex = 0;
-        }
+        _history.Clear();
+        _nextIndex = 0;
     }
 }

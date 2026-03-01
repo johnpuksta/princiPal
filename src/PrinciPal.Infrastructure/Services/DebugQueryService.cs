@@ -5,7 +5,6 @@ using PrinciPal.Common.Errors.Debugger;
 using PrinciPal.Common.Extensions;
 using PrinciPal.Common.Options;
 using PrinciPal.Common.Results;
-using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 
 namespace PrinciPal.Infrastructure.Services;
@@ -382,10 +381,10 @@ public class DebugQueryService : IDebugQueryService
     // Helpers
     // ------------------------------------------------------------------
 
-    private Result<DebugStateStore> ResolveStore(string session) =>
+    private Result<IDebugStateStore> ResolveStore(string session) =>
         _sessionManager.ResolveByNameOrId(session);
 
-    private static Result<DebugState> GetBreakModeState(DebugStateStore store)
+    private static Result<DebugState> GetBreakModeState(IDebugStateStore store)
     {
         var state = store.GetCurrentState();
         if (state is null)

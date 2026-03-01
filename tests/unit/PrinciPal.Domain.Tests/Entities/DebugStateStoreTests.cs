@@ -103,8 +103,6 @@ public class DebugStateStoreTests
         Assert.Null(_store.GetLastExpression());
     }
 
-    #region History
-
     [Fact]
     public void GetHistory_ReturnsEmpty_WhenNoBreakModeUpdates()
     {
@@ -162,7 +160,6 @@ public class DebugStateStoreTests
         var history = _store.GetHistory();
 
         Assert.Equal(3, history.Count);
-        // Oldest two (index 0, 1) should be evicted; remaining are indices 2, 3, 4
         Assert.Equal(2, history[0].Index);
         Assert.Equal(3, history[1].Index);
         Assert.Equal(4, history[2].Index);
@@ -242,10 +239,6 @@ public class DebugStateStoreTests
         Assert.Equal(0, history[0].Index);
     }
 
-    #endregion
-
-    #region TotalCaptured & Eviction Edge Cases
-
     [Fact]
     public void TotalCaptured_TracksLifetimeCount()
     {
@@ -281,109 +274,122 @@ public class DebugStateStoreTests
             });
         }
 
-        // Indices 0 and 1 were evicted
         Assert.Null(_store.GetSnapshot(0));
         Assert.Null(_store.GetSnapshot(1));
-        // Index 2 is the oldest surviving
         Assert.NotNull(_store.GetSnapshot(2));
         Assert.Equal("File2.cs", _store.GetSnapshot(2)!.State.CurrentLocation!.FilePath);
     }
 
     [Fact]
-    public async Task ConcurrentReadsAndWrites_DoNotThrow()
+    public void UpdateExpression_OverwritesPreviousExpression()
     {
-        var store = new DebugStateStore();
-        var exceptions = new List<Exception>();
+        _store.UpdateExpression(new ExpressionResult { Expression = "a", Value = "1", Type = "int", IsValid = true });
+        _store.UpdateExpression(new ExpressionResult { Expression = "b", Value = "2", Type = "int", IsValid = true });
 
-        var tasks = new List<Task>();
+        var result = _store.GetLastExpression();
 
-        // Writers
-        for (int i = 0; i < 50; i++)
-        {
-            var index = i;
-            tasks.Add(Task.Run(() =>
-            {
-                try
-                {
-                    store.Update(new DebugState
-                    {
-                        IsInBreakMode = index % 2 == 0,
-                        CurrentLocation = new SourceLocation
-                        {
-                            FilePath = $"file{index}.cs",
-                            Line = index,
-                            FunctionName = $"Method{index}",
-                            ProjectName = "TestProject"
-                        }
-                    });
-                }
-                catch (Exception ex)
-                {
-                    lock (exceptions) { exceptions.Add(ex); }
-                }
-            }));
-        }
-
-        // Expression writers
-        for (int i = 0; i < 50; i++)
-        {
-            var index = i;
-            tasks.Add(Task.Run(() =>
-            {
-                try
-                {
-                    store.UpdateExpression(new ExpressionResult
-                    {
-                        Expression = $"expr{index}",
-                        Value = $"{index}",
-                        Type = "int",
-                        IsValid = true
-                    });
-                }
-                catch (Exception ex)
-                {
-                    lock (exceptions) { exceptions.Add(ex); }
-                }
-            }));
-        }
-
-        // Readers
-        for (int i = 0; i < 100; i++)
-        {
-            tasks.Add(Task.Run(() =>
-            {
-                try
-                {
-                    _ = store.GetCurrentState();
-                    _ = store.GetLastExpression();
-                }
-                catch (Exception ex)
-                {
-                    lock (exceptions) { exceptions.Add(ex); }
-                }
-            }));
-        }
-
-        // Clearers
-        for (int i = 0; i < 10; i++)
-        {
-            tasks.Add(Task.Run(() =>
-            {
-                try
-                {
-                    store.Clear();
-                }
-                catch (Exception ex)
-                {
-                    lock (exceptions) { exceptions.Add(ex); }
-                }
-            }));
-        }
-
-        await Task.WhenAll(tasks);
-
-        Assert.Empty(exceptions);
+        Assert.NotNull(result);
+        Assert.Equal("b", result.Expression);
+        Assert.Equal("2", result.Value);
     }
 
-    #endregion
+    [Fact]
+    public void GetHistory_ReturnsCopy_MutationsDoNotAffectInternalState()
+    {
+        _store.Update(new DebugState
+        {
+            IsInBreakMode = true,
+            CurrentLocation = new SourceLocation { FilePath = "A.cs", Line = 1, FunctionName = "A" }
+        });
+
+        var history = _store.GetHistory();
+        history.Clear();
+
+        var historyAgain = _store.GetHistory();
+        Assert.Single(historyAgain);
+    }
+
+    [Fact]
+    public void TotalCaptured_IsZero_Initially()
+    {
+        Assert.Equal(0, _store.TotalCaptured);
+    }
+
+    [Fact]
+    public void TotalCaptured_DoesNotCountNonBreakModeUpdates()
+    {
+        _store.Update(new DebugState { IsInBreakMode = false });
+        _store.Update(new DebugState { IsInBreakMode = false });
+        _store.Update(new DebugState { IsInBreakMode = true });
+
+        Assert.Equal(1, _store.TotalCaptured);
+    }
+
+    [Fact]
+    public void Clear_ResetsTotalCapturedToZero()
+    {
+        _store.Update(new DebugState { IsInBreakMode = true });
+        _store.Update(new DebugState { IsInBreakMode = true });
+        Assert.Equal(2, _store.TotalCaptured);
+
+        _store.Clear();
+
+        Assert.Equal(0, _store.TotalCaptured);
+    }
+
+    [Fact]
+    public void Update_DoesNotEvict_WhenExactlyAtMaxHistorySize()
+    {
+        _store.MaxHistorySize = 3;
+
+        for (int i = 0; i < 3; i++)
+        {
+            _store.Update(new DebugState
+            {
+                IsInBreakMode = true,
+                CurrentLocation = new SourceLocation { FilePath = $"File{i}.cs", Line = i, FunctionName = $"F{i}" }
+            });
+        }
+
+        var history = _store.GetHistory();
+        Assert.Equal(3, history.Count);
+        Assert.Equal(0, history[0].Index);
+        Assert.Equal(1, history[1].Index);
+        Assert.Equal(2, history[2].Index);
+    }
+
+    [Fact]
+    public void GetHistory_ReturnsOldestFirst_AfterEviction()
+    {
+        _store.MaxHistorySize = 3;
+
+        for (int i = 0; i < 6; i++)
+        {
+            _store.Update(new DebugState
+            {
+                IsInBreakMode = true,
+                CurrentLocation = new SourceLocation { FilePath = $"File{i}.cs", Line = i, FunctionName = $"F{i}" }
+            });
+        }
+
+        var history = _store.GetHistory();
+        Assert.Equal(3, history.Count);
+        Assert.True(history[0].Index < history[1].Index);
+        Assert.True(history[1].Index < history[2].Index);
+        Assert.Equal(3, history[0].Index);
+        Assert.Equal(5, history[2].Index);
+    }
+
+    [Fact]
+    public void Snapshot_CapturedAt_IsPopulated()
+    {
+        var before = DateTime.UtcNow;
+        _store.Update(new DebugState { IsInBreakMode = true });
+        var after = DateTime.UtcNow;
+
+        var snapshot = _store.GetSnapshot(0);
+
+        Assert.NotNull(snapshot);
+        Assert.InRange(snapshot.CapturedAt, before, after);
+    }
 }

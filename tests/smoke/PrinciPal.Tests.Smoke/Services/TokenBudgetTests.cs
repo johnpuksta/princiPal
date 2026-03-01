@@ -1,4 +1,4 @@
-using PrinciPal.Domain.Entities;
+using PrinciPal.Application.Abstractions;
 using PrinciPal.Domain.ValueObjects;
 using PrinciPal.Infrastructure.Services;
 
@@ -11,7 +11,7 @@ namespace PrinciPal.Tests.Smoke.Services;
 public class TokenBudgetTests
 {
     private readonly SessionManager _sessionManager = new();
-    private readonly DebugStateStore _store;
+    private readonly IDebugStateStore _store;
     private readonly DebugQueryService _service;
 
     private const string TestSessionId = "b1c2d3e4";

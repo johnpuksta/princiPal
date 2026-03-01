@@ -3,7 +3,6 @@ using PrinciPal.Application.Abstractions;
 using PrinciPal.Common.Errors.Session;
 using PrinciPal.Common.Options;
 using PrinciPal.Common.Results;
-using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 
 namespace PrinciPal.Infrastructure.Services;
@@ -11,7 +10,7 @@ namespace PrinciPal.Infrastructure.Services;
 /// <summary>
 /// Manages multiple VS debug sessions. Each session is keyed by a unique ID
 /// (short hash of the solution path) and has a friendly name (solution filename).
-/// Each session gets its own <see cref="DebugStateStore"/> instance.
+/// Each session gets its own <see cref="IDebugStateStore"/> instance.
 /// </summary>
 public class SessionManager : ISessionManager
 {
@@ -20,14 +19,14 @@ public class SessionManager : ISessionManager
     public int SessionCount => _sessions.Count;
 
     /// <summary>
-    /// Gets or creates a session, returning its <see cref="DebugStateStore"/>.
+    /// Gets or creates a session, returning its <see cref="IDebugStateStore"/>.
     /// Auto-registers the session on first access.
     /// </summary>
-    public DebugStateStore GetOrCreateSession(string sessionId, string? name = null, string? solutionPath = null)
+    public IDebugStateStore GetOrCreateSession(string sessionId, string? name = null, string? solutionPath = null)
     {
         var entry = _sessions.GetOrAdd(sessionId, id => new SessionEntry
         {
-            Store = new DebugStateStore(),
+            Store = new ThreadSafeDebugStateStore(),
             Info = new SessionInfo
             {
                 SessionId = id,
@@ -49,22 +48,22 @@ public class SessionManager : ISessionManager
     /// <summary>
     /// Gets a session's store by its unique ID, or None if not found.
     /// </summary>
-    public Option<DebugStateStore> GetSession(string sessionId)
+    public Option<IDebugStateStore> GetSession(string sessionId)
     {
         return _sessions.TryGetValue(sessionId, out var entry)
             ? Option.Some(entry.Store)
-            : Option<DebugStateStore>.None;
+            : Option<IDebugStateStore>.None;
     }
 
     /// <summary>
     /// Resolves a query string (name or ID) to a session store.
     /// Returns Success(store) on match, or Failure with appropriate error.
     /// </summary>
-    public Result<DebugStateStore> ResolveByNameOrId(string query)
+    public Result<IDebugStateStore> ResolveByNameOrId(string query)
     {
         // Try exact ID match first
         if (_sessions.TryGetValue(query, out var entry))
-            return entry.Store;
+            return Result<IDebugStateStore>.Success(entry.Store);
 
         // Try name match
         var matches = _sessions.Values
@@ -72,7 +71,7 @@ public class SessionManager : ISessionManager
             .ToList();
 
         if (matches.Count == 1)
-            return matches[0].Store;
+            return Result<IDebugStateStore>.Success(matches[0].Store);
 
         if (matches.Count > 1)
         {
@@ -115,7 +114,7 @@ public class SessionManager : ISessionManager
 
     private class SessionEntry
     {
-        public required DebugStateStore Store { get; init; }
+        public required IDebugStateStore Store { get; init; }
         public required SessionInfo Info { get; init; }
     }
 }
