@@ -212,7 +212,11 @@ public class DebugTools
             throw new McpException("No breakpoint history available. Hit some breakpoints first — each break-mode stop is recorded automatically.");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"History ({history.Count} snapshots)");
+        var totalCaptured = _store.TotalCaptured;
+        if (totalCaptured > history.Count)
+            sb.AppendLine($"History ({history.Count} of {totalCaptured} captured, showing #{history[0].Index}..#{history[^1].Index})");
+        else
+            sb.AppendLine($"History ({history.Count} snapshots)");
 
         foreach (var snapshot in history)
         {
@@ -241,7 +245,15 @@ public class DebugTools
     {
         var snapshot = _store.GetSnapshot(index);
         if (snapshot is null)
+        {
+            if (index >= 0 && index < _store.TotalCaptured)
+            {
+                var history = _store.GetHistory();
+                var oldest = history.Count > 0 ? history[0].Index : _store.TotalCaptured;
+                throw new McpException($"Snapshot #{index} was evicted (history keeps last {_store.MaxHistorySize}). Oldest available: #{oldest}.");
+            }
             throw new McpException($"Snapshot #{index} not found. Use get_breakpoint_history to see available snapshots.");
+        }
 
         var state = snapshot.State;
         var sb = new StringBuilder();
@@ -294,8 +306,15 @@ public class DebugTools
         var sb = new StringBuilder();
 
         // Header
-        if (count > 0 || start > 0)
-            sb.AppendLine($"Trace ({history.Count} total, showing {filtered.Count} from #{start})");
+        var totalCaptured = _store.TotalCaptured;
+        var hasEviction = totalCaptured > history.Count;
+        var hasPagination = count > 0 || start > 0;
+        if (hasEviction || hasPagination)
+        {
+            var actualStart = filtered.Count > 0 ? filtered[0].Index : start;
+            var totalLabel = hasEviction ? $"{history.Count} of {totalCaptured} captured" : $"{history.Count} total";
+            sb.AppendLine($"Trace ({totalLabel}, showing {filtered.Count} from #{actualStart})");
+        }
         else
             sb.AppendLine($"Trace ({filtered.Count} snapshots)");
 

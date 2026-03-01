@@ -244,6 +244,53 @@ public class DebugStateStoreTests
         Assert.Equal(0, history[0].Index);
     }
 
+    // =================================================================
+    // TotalCaptured & Eviction Edge Cases
+    // =================================================================
+
+    [Fact]
+    public void TotalCaptured_TracksLifetimeCount()
+    {
+        for (int i = 0; i < 5; i++)
+            _store.Update(new DebugState { IsInBreakMode = true });
+
+        Assert.Equal(5, _store.TotalCaptured);
+    }
+
+    [Fact]
+    public void TotalCaptured_KeepsCountingAfterEviction()
+    {
+        _store.MaxHistorySize = 3;
+
+        for (int i = 0; i < 5; i++)
+            _store.Update(new DebugState { IsInBreakMode = true });
+
+        Assert.Equal(5, _store.TotalCaptured);
+        Assert.Equal(3, _store.GetHistory().Count);
+    }
+
+    [Fact]
+    public void GetSnapshot_ReturnsNull_ForEvictedIndex()
+    {
+        _store.MaxHistorySize = 3;
+
+        for (int i = 0; i < 5; i++)
+        {
+            _store.Update(new DebugState
+            {
+                IsInBreakMode = true,
+                CurrentLocation = new SourceLocation { FilePath = $"File{i}.cs", Line = i, FunctionName = $"F{i}" }
+            });
+        }
+
+        // Indices 0 and 1 were evicted
+        Assert.Null(_store.GetSnapshot(0));
+        Assert.Null(_store.GetSnapshot(1));
+        // Index 2 is the oldest surviving
+        Assert.NotNull(_store.GetSnapshot(2));
+        Assert.Equal("File2.cs", _store.GetSnapshot(2)!.State.CurrentLocation!.FilePath);
+    }
+
     [Fact]
     public async Task ConcurrentReadsAndWrites_DoNotThrow()
     {

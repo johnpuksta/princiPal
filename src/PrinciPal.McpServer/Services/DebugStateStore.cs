@@ -21,6 +21,12 @@ public class DebugStateStore
     /// </summary>
     public int MaxHistorySize { get; set; } = 50;
 
+    /// <summary>
+    /// Total number of snapshots ever captured (including evicted ones).
+    /// Use to distinguish evicted snapshots from never-existed ones.
+    /// </summary>
+    public int TotalCaptured { get { lock (_lock) { return _nextIndex; } } }
+
     public void Update(DebugState state)
     {
         lock (_lock)

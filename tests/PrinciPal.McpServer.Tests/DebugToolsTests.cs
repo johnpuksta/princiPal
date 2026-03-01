@@ -587,6 +587,162 @@ public class DebugToolsTests
         Assert.Contains("processed:bool=true", result);
     }
 
+    // =================================================================
+    // Rolling History Edge Cases (50-snapshot cap)
+    // =================================================================
+
+    /// <summary>
+    /// Helper: push N distinct break-mode snapshots with unique data per snapshot.
+    /// Each gets a unique file, line, function, locals with members, and a 2-frame call stack.
+    /// </summary>
+    private void PushSnapshots(int count)
+    {
+        for (int i = 0; i < count; i++)
+        {
+            _store.Update(CreateBreakModeState(
+                location: new SourceLocation
+                {
+                    FilePath = $@"C:\src\File{i}.cs",
+                    Line = i + 1,
+                    Column = 1,
+                    FunctionName = $"Method{i}",
+                    ProjectName = $"Proj{i}"
+                },
+                locals: new List<LocalVariable>
+                {
+                    new()
+                    {
+                        Name = $"var{i}",
+                        Type = "int",
+                        Value = $"{i * 10}",
+                        IsValidValue = true,
+                        Members = new List<LocalVariable>
+                        {
+                            new() { Name = "Inner", Type = "string", Value = $"\"val{i}\"", IsValidValue = true }
+                        }
+                    }
+                },
+                callStack: new List<StackFrameInfo>
+                {
+                    new() { Index = 0, FunctionName = $"Method{i}", Module = "App.dll", Language = "C#", FilePath = $@"C:\src\File{i}.cs", Line = i + 1 },
+                    new() { Index = 1, FunctionName = "Main", Module = "App.dll", Language = "C#", FilePath = @"C:\src\Program.cs", Line = 10 }
+                },
+                breakpoints: new List<BreakpointInfo>
+                {
+                    new() { FilePath = $@"C:\src\File{i}.cs", Line = i + 1, Enabled = true, FunctionName = $"Method{i}" }
+                }));
+        }
+    }
+
+    [Fact]
+    public void GetSnapshot_ReturnsEvictedMessage_ForOldIndex()
+    {
+        PushSnapshots(55); // cap=50, so indices 0..4 evicted
+
+        var ex = Assert.Throws<McpException>(() => _tools.GetSnapshot(0));
+
+        Assert.Contains("evicted", ex.Message);
+        Assert.Contains("last 50", ex.Message);
+        Assert.Contains("#5", ex.Message); // oldest available
+    }
+
+    [Fact]
+    public void GetSnapshot_StillWorks_ForSurvivingIndex()
+    {
+        PushSnapshots(55); // oldest surviving = index 5
+
+        var result = _tools.GetSnapshot(5);
+
+        Assert.Contains("#5", result);
+        Assert.Contains("Method5", result);
+        Assert.Contains("File5.cs:6", result);
+        Assert.Contains("var5:int=50", result);
+        Assert.Contains("[stack]", result);
+    }
+
+    [Fact]
+    public void GetBreakpointHistory_ShowsEvictionInfo_WhenRolling()
+    {
+        PushSnapshots(55);
+
+        var result = _tools.GetBreakpointHistory();
+
+        Assert.Contains("50 of 55", result);
+        Assert.Contains("#5", result); // first entry
+    }
+
+    [Fact]
+    public void GetBreakpointHistory_ShowsSimpleHeader_WhenNoEviction()
+    {
+        PushSnapshots(10);
+
+        var result = _tools.GetBreakpointHistory();
+
+        Assert.Contains("10 snapshots", result);
+        Assert.DoesNotContain(" of ", result);
+    }
+
+    [Fact]
+    public void ExplainExecutionFlow_AfterEviction_FirstSnapshotGetsFull()
+    {
+        PushSnapshots(55); // oldest surviving = #5
+
+        var result = _tools.ExplainExecutionFlow(detail: "changes");
+
+        // First surviving snapshot (#5) should show full locals, not a diff
+        Assert.Contains("var5:int=50", result);
+        Assert.Contains("[locals]", result);
+    }
+
+    [Fact]
+    public void ExplainExecutionFlow_AfterEviction_HeaderShowsTotalCaptured()
+    {
+        PushSnapshots(55);
+
+        var result = _tools.ExplainExecutionFlow();
+
+        Assert.Contains("50 of 55", result);
+    }
+
+    [Fact]
+    public void ExplainExecutionFlow_Pagination_WithEviction()
+    {
+        PushSnapshots(55);
+
+        var result = _tools.ExplainExecutionFlow(start: 10, count: 3);
+
+        Assert.Contains("showing 3 from #10", result);
+        Assert.Contains("#10", result);
+        Assert.Contains("#11", result);
+        Assert.Contains("#12", result);
+        Assert.DoesNotContain("#13", result);
+    }
+
+    [Fact]
+    public void GetSnapshot_AllDataIntact_AfterEviction()
+    {
+        PushSnapshots(55);
+
+        // Oldest surviving = index 5
+        var result = _tools.GetSnapshot(5, depth: 2);
+
+        // Location
+        Assert.Contains("Method5", result);
+        Assert.Contains("File5.cs:6", result);
+        Assert.Contains("[Proj5]", result);
+        // Locals with members
+        Assert.Contains("var5:int=50", result);
+        Assert.Contains(".Inner:string=\"val5\"", result);
+        // Call stack
+        Assert.Contains("[stack]", result);
+        Assert.Contains("0: Method5 (File5.cs:6)", result);
+        Assert.Contains("1: Main (Program.cs:10)", result);
+    }
+
+    // =================================================================
+    // Existing tests (continued)
+    // =================================================================
+
     [Fact]
     public void ExplainCurrentState_ReturnsPartialContent_WhenSomeSectionsFail()
     {
