@@ -4,6 +4,8 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 using System.Threading;
+using PrinciPal.Common.Errors.Server;
+using PrinciPal.Common.Results;
 
 namespace PrinciPal.VsExtension
 {
@@ -38,11 +40,11 @@ namespace PrinciPal.VsExtension
                 _port = port;
                 _restartCount = 0;
 
-                var lockHandle = ServerLockFile.TryAcquire(port);
-                if (lockHandle == null)
+                var lockResult = ServerLockFile.TryAcquire(port);
+                if (lockResult.IsFailure)
                 {
-                    // Another extension instance is starting the server — wait for it
-                    _log("Another instance is starting the MCP server. Waiting for health...");
+                    // Another instance is starting the server — wait for it
+                    _log($"{lockResult.Error.Description} Waiting for health...");
                     if (WaitForHealth(port, TimeSpan.FromSeconds(10)))
                     {
                         _log("MCP server is ready (started by another instance).");
@@ -52,6 +54,7 @@ namespace PrinciPal.VsExtension
                     return;
                 }
 
+                var lockHandle = lockResult.Value;
                 StartProcess();
 
                 if (_process != null && !_process.HasExited)
@@ -80,10 +83,14 @@ namespace PrinciPal.VsExtension
 
         private void StartProcess()
         {
-            var startInfo = ResolveStartInfo();
-            if (startInfo == null) return;
+            var startInfoResult = ResolveStartInfo();
+            if (startInfoResult.IsFailure)
+            {
+                _log(startInfoResult.Error.Description);
+                return;
+            }
 
-            _process = new Process { StartInfo = startInfo, EnableRaisingEvents = true };
+            _process = new Process { StartInfo = startInfoResult.Value, EnableRaisingEvents = true };
             _process.OutputDataReceived += (s, e) => { if (e.Data != null) _log(e.Data); };
             _process.ErrorDataReceived += (s, e) => { if (e.Data != null) _log($"[stderr] {e.Data}"); };
             _process.Exited += OnProcessExited;
@@ -101,7 +108,7 @@ namespace PrinciPal.VsExtension
             }
         }
 
-        private ProcessStartInfo? ResolveStartInfo()
+        private Result<ProcessStartInfo> ResolveStartInfo()
         {
             var extensionDir = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
             var exePath = Path.Combine(extensionDir, ServerExeRelativePath);
@@ -142,8 +149,7 @@ namespace PrinciPal.VsExtension
                 }
             }
 
-            _log($"Server not found. Checked:\n  - {exePath}\n  - {devMarkerPath}");
-            return null;
+            return new ServerBinaryNotFoundError(exePath, devMarkerPath);
         }
 
         private void OnProcessExited(object sender, EventArgs e)

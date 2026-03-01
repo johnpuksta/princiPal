@@ -7,6 +7,8 @@ using System.Text;
 using System.Threading;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
+using PrinciPal.VsExtension.Adapters;
+using PrinciPal.VsExtension.Services;
 using Task = System.Threading.Tasks.Task;
 
 namespace PrinciPal.VsExtension
@@ -20,6 +22,7 @@ namespace PrinciPal.VsExtension
         public const string PackageGuidString = "28d14e0c-5a8f-4b7f-9c12-3e8a6b5d4c9f";
 
         private DebuggerEventHandler? _debuggerEventHandler;
+        private HttpDebugStatePublisher? _publisher;
         private ServerProcessManager? _processManager;
         private OutputLogger? _logger;
 
@@ -87,7 +90,11 @@ namespace PrinciPal.VsExtension
                 _logger.Log($"Auto-start disabled. Start the MCP server manually on port {port}.");
             }
 
-            _debuggerEventHandler = new DebuggerEventHandler(dte, this, port, sessionId, sessionName, solutionPath ?? "");
+            var reader = new VsDebuggerAdapter(dte);
+            _publisher = new HttpDebugStatePublisher(port, sessionId, sessionName, solutionPath ?? "");
+            var coordinator = new DebugEventCoordinator(reader, _publisher, _logger);
+
+            _debuggerEventHandler = new DebuggerEventHandler(dte, this, coordinator, _logger);
             _debuggerEventHandler.Initialize();
 
             _logger.Log($"Session: {sessionName} [{sessionId}]");
@@ -110,6 +117,7 @@ namespace PrinciPal.VsExtension
                 }
 
                 _debuggerEventHandler?.Dispose();
+                _publisher?.Dispose();
                 _processManager?.Dispose();
             }
             base.Dispose(disposing);

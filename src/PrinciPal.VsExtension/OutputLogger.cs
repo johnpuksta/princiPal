@@ -3,10 +3,11 @@ using System.Diagnostics;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
+using PrinciPal.VsExtension.Abstractions;
 
 namespace PrinciPal.VsExtension
 {
-    public sealed class OutputLogger
+    public sealed class OutputLogger : IExtensionLogger
     {
         private IVsOutputWindowPane? _pane;
 

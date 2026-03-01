@@ -2,7 +2,8 @@ using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using System.Threading;
+using PrinciPal.Common.Errors.Extension;
+using PrinciPal.Common.Results;
 
 namespace PrinciPal.VsExtension
 {
@@ -24,9 +25,9 @@ namespace PrinciPal.VsExtension
         /// <summary>
         /// Attempts to acquire the startup lock for the given port.
         /// If a stale lock file exists (PID dead), it is removed first.
-        /// Returns a FileStream handle on success, or null if another instance holds the lock.
+        /// Returns a FileStream handle on success, or a typed error describing why the lock was not acquired.
         /// </summary>
-        public static FileStream? TryAcquire(int port)
+        public static Result<FileStream> TryAcquire(int port)
         {
             var path = GetLockFilePath(port);
 
@@ -48,7 +49,7 @@ namespace PrinciPal.VsExtension
                             {
                                 Process.GetProcessById(pid);
                                 // Process is alive — lock is valid
-                                return null;
+                                return new LockHeldError(port, pid);
                             }
                             catch (ArgumentException)
                             {
@@ -61,7 +62,8 @@ namespace PrinciPal.VsExtension
                 catch
                 {
                     // Can't read/parse — try to delete
-                    try { File.Delete(path); } catch { return null; }
+                    try { File.Delete(path); }
+                    catch { return new LockFileCorruptError(port); }
                 }
             }
 
@@ -72,7 +74,7 @@ namespace PrinciPal.VsExtension
             catch (IOException)
             {
                 // Another instance created the file between our check and CreateNew
-                return null;
+                return new LockHeldError(port, 0);
             }
         }
 

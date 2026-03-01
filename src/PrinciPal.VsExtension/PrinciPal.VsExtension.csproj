@@ -43,7 +43,14 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\PrinciPal.Common\PrinciPal.Common.csproj" />
     <ProjectReference Include="..\PrinciPal.Domain\PrinciPal.Domain.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>PrinciPal.VsExtension.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>
