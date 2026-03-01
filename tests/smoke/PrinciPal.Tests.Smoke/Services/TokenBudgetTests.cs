@@ -2,7 +2,7 @@ using PrinciPal.Domain.Entities;
 using PrinciPal.Domain.ValueObjects;
 using PrinciPal.Infrastructure.Services;
 
-namespace PrinciPal.Infrastructure.Tests.Services;
+namespace PrinciPal.Tests.Smoke.Services;
 
 /// <summary>
 /// Regression guard tests that assert maximum character counts for realistic scenarios.

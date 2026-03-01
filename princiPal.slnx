@@ -13,6 +13,9 @@
     <Project Path="tests/unit/PrinciPal.Infrastructure.Tests/PrinciPal.Infrastructure.Tests.csproj" />
     <Project Path="tests/unit/PrinciPal.Server.Tests/PrinciPal.Server.Tests.csproj" />
   </Folder>
+  <Folder Name="/tests/smoke/">
+    <Project Path="tests/smoke/PrinciPal.Tests.Smoke/PrinciPal.Tests.Smoke.csproj" />
+  </Folder>
   <Folder Name="/tests/integration/">
     <Project Path="tests/integration/PrinciPal.Integration.Tests/PrinciPal.Integration.Tests.csproj" />
   </Folder>
