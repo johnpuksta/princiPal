@@ -24,7 +24,9 @@ public class DebugTools
 
     [McpServerTool(Name = "get_debug_state", ReadOnly = true)]
     [Description("Get the full current debug state from Visual Studio including locals, call stack, and current source location. Use this to understand what is happening at a breakpoint.")]
-    public string GetDebugState()
+    public string GetDebugState(
+        [Description("Max member expansion depth (0=flat, 2=default)")]
+        int depth = 2)
     {
         var state = _store.GetCurrentState();
         if (state is null)
@@ -34,36 +36,23 @@ public class DebugTools
             throw new McpException("Visual Studio is not in break mode. Hit a breakpoint first.");
 
         var sb = new StringBuilder();
-        sb.AppendLine("## Debug State");
-        sb.AppendLine();
 
-        // Current location
         if (state.CurrentLocation is not null)
         {
-            sb.AppendLine("### Current Location");
-            sb.AppendLine($"- **File**: {state.CurrentLocation.FilePath}");
-            sb.AppendLine($"- **Line**: {state.CurrentLocation.Line}");
-            sb.AppendLine($"- **Function**: {state.CurrentLocation.FunctionName}");
-            sb.AppendLine($"- **Project**: {state.CurrentLocation.ProjectName}");
-            sb.AppendLine();
+            sb.AppendLine("[loc]");
+            sb.AppendLine(CompactFormatter.FormatLocation(state.CurrentLocation));
         }
 
-        // Locals
         if (state.Locals.Count > 0)
         {
-            sb.AppendLine("### Local Variables");
-            FormatVariables(sb, state.Locals, indent: 0);
-            sb.AppendLine();
+            sb.AppendLine("[locals]");
+            CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
         }
 
-        // Call stack
         if (state.CallStack.Count > 0)
         {
-            sb.AppendLine("### Call Stack");
-            foreach (var frame in state.CallStack)
-            {
-                sb.AppendLine($"  {frame.Index}. `{frame.FunctionName}` ({frame.Module}) - {frame.FilePath}:{frame.Line}");
-            }
+            sb.AppendLine("[stack]");
+            CompactFormatter.FormatCallStack(sb, state.CallStack);
         }
 
         return sb.ToString();
@@ -71,7 +60,9 @@ public class DebugTools
 
     [McpServerTool(Name = "get_locals", ReadOnly = true)]
     [Description("Get all local variables and their values at the current breakpoint in Visual Studio. Returns variable names, types, values, and nested members.")]
-    public string GetLocals()
+    public string GetLocals(
+        [Description("Max member expansion depth (0=flat, 2=default)")]
+        int depth = 2)
     {
         var state = GetBreakModeState();
 
@@ -79,9 +70,8 @@ public class DebugTools
             return "No local variables in the current scope.";
 
         var sb = new StringBuilder();
-        sb.AppendLine("## Local Variables");
-        sb.AppendLine();
-        FormatVariables(sb, state.Locals, indent: 0);
+        sb.AppendLine("[locals]");
+        CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
         return sb.ToString();
     }
 
@@ -95,18 +85,8 @@ public class DebugTools
             return "Call stack is empty.";
 
         var sb = new StringBuilder();
-        sb.AppendLine("## Call Stack");
-        sb.AppendLine();
-        foreach (var frame in state.CallStack)
-        {
-            var location = !string.IsNullOrEmpty(frame.FilePath)
-                ? $"{frame.FilePath}:{frame.Line}"
-                : "(external code)";
-            sb.AppendLine($"  {frame.Index}. `{frame.FunctionName}` [{frame.Language}]");
-            sb.AppendLine($"     Module: {frame.Module}");
-            sb.AppendLine($"     Location: {location}");
-        }
-
+        sb.AppendLine("[stack]");
+        CompactFormatter.FormatCallStack(sb, state.CallStack);
         return sb.ToString();
     }
 
@@ -156,16 +136,16 @@ public class DebugTools
             return "No breakpoints are set.";
 
         var sb = new StringBuilder();
-        sb.AppendLine("## Breakpoints");
-        sb.AppendLine();
+        sb.AppendLine("[breakpoints]");
         foreach (var bp in state.Breakpoints)
         {
-            var status = bp.Enabled ? "enabled" : "disabled";
-            sb.AppendLine($"- **{Path.GetFileName(bp.FilePath)}:{bp.Line}** ({status})");
+            var status = bp.Enabled ? "on" : "off";
+            sb.Append($"{Path.GetFileName(bp.FilePath)}:{bp.Line} ({status})");
             if (!string.IsNullOrEmpty(bp.FunctionName))
-                sb.AppendLine($"  Function: `{bp.FunctionName}`");
+                sb.Append($" {bp.FunctionName}");
             if (!string.IsNullOrEmpty(bp.Condition))
-                sb.AppendLine($"  Condition: `{bp.Condition}`");
+                sb.Append($" when {bp.Condition}");
+            sb.AppendLine();
         }
 
         return sb.ToString();
@@ -173,25 +153,21 @@ public class DebugTools
 
     [McpServerTool(Name = "get_expression_result", ReadOnly = true)]
     [Description("Get the result of the last expression evaluated in the Visual Studio debugger. The VSIX extension pushes expression results after evaluation.")]
-    public string GetExpressionResult()
+    public string GetExpressionResult(
+        [Description("Max member expansion depth (0=flat, 2=default)")]
+        int depth = 2)
     {
         var result = _store.GetLastExpression();
         if (result is null)
             throw new McpException("No expression result available. Evaluate an expression in Visual Studio first.");
 
         var sb = new StringBuilder();
-        sb.AppendLine("## Expression Result");
-        sb.AppendLine();
-        sb.AppendLine($"- **Expression**: `{result.Expression}`");
-        sb.AppendLine($"- **Type**: `{result.Type}`");
-        sb.AppendLine($"- **Value**: `{result.Value}`");
-        sb.AppendLine($"- **Valid**: {result.IsValid}");
+        var valid = result.IsValid ? "" : " [!]";
+        sb.AppendLine($"expr {result.Expression}:{result.Type}={result.Value}{valid}");
 
         if (result.Members.Count > 0)
         {
-            sb.AppendLine();
-            sb.AppendLine("### Members");
-            FormatVariables(sb, result.Members, indent: 0);
+            CompactFormatter.FormatVariables(sb, result.Members, 1, depth);
         }
 
         return sb.ToString();
@@ -236,8 +212,7 @@ public class DebugTools
             throw new McpException("No breakpoint history available. Hit some breakpoints first — each break-mode stop is recorded automatically.");
 
         var sb = new StringBuilder();
-        sb.AppendLine($"## Breakpoint History ({history.Count} snapshots)");
-        sb.AppendLine();
+        sb.AppendLine($"History ({history.Count} snapshots)");
 
         foreach (var snapshot in history)
         {
@@ -248,7 +223,7 @@ public class DebugTools
             var localCount = snapshot.State.Locals.Count;
             var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
 
-            sb.AppendLine($"- **#{snapshot.Index}** [{time}] `{func}` at {file}:{line} ({localCount} locals)");
+            sb.AppendLine($"#{snapshot.Index} [{time}] {func} ({file}:{line}) {localCount} locals");
         }
 
         return sb.ToString();
@@ -258,7 +233,11 @@ public class DebugTools
     [Description("Get the full debug state for a specific breakpoint snapshot by its index number. Returns locals, call stack, and source location captured at that breakpoint hit. Use get_breakpoint_history first to see available snapshot indices.")]
     public string GetSnapshot(
         [Description("The snapshot index number from get_breakpoint_history")]
-        int index)
+        int index,
+        [Description("Detail level: full, changes, summary (default full)")]
+        string detail = "full",
+        [Description("Max member expansion depth (0=flat, 2=default)")]
+        int depth = 2)
     {
         var snapshot = _store.GetSnapshot(index);
         if (snapshot is null)
@@ -266,37 +245,27 @@ public class DebugTools
 
         var state = snapshot.State;
         var sb = new StringBuilder();
-        sb.AppendLine($"## Snapshot #{snapshot.Index}");
-        sb.AppendLine($"**Captured**: {snapshot.CapturedAt:HH:mm:ss.fff} UTC");
-        sb.AppendLine();
+        var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
 
         if (state.CurrentLocation is not null)
         {
-            sb.AppendLine("### Location");
-            sb.AppendLine($"- **File**: {state.CurrentLocation.FilePath}");
-            sb.AppendLine($"- **Line**: {state.CurrentLocation.Line}");
-            sb.AppendLine($"- **Function**: {state.CurrentLocation.FunctionName}");
-            sb.AppendLine($"- **Project**: {state.CurrentLocation.ProjectName}");
-            sb.AppendLine();
+            sb.AppendLine($"#{snapshot.Index} [{time}] {CompactFormatter.FormatLocation(state.CurrentLocation)}");
+        }
+        else
+        {
+            sb.AppendLine($"#{snapshot.Index} [{time}]");
         }
 
         if (state.Locals.Count > 0)
         {
-            sb.AppendLine("### Local Variables");
-            FormatVariables(sb, state.Locals, indent: 0);
-            sb.AppendLine();
+            sb.AppendLine("[locals]");
+            CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
         }
 
         if (state.CallStack.Count > 0)
         {
-            sb.AppendLine("### Call Stack");
-            foreach (var frame in state.CallStack)
-            {
-                var location = !string.IsNullOrEmpty(frame.FilePath)
-                    ? $"{frame.FilePath}:{frame.Line}"
-                    : "(external code)";
-                sb.AppendLine($"  {frame.Index}. `{frame.FunctionName}` [{frame.Language}] — {location}");
-            }
+            sb.AppendLine("[stack]");
+            CompactFormatter.FormatCallStack(sb, state.CallStack);
         }
 
         return sb.ToString();
@@ -304,17 +273,35 @@ public class DebugTools
 
     [McpServerTool(Name = "explain_execution_flow", ReadOnly = true)]
     [Description("Get all captured breakpoint snapshots formatted as an execution trace. Ideal for asking the AI to analyze how values change across multiple breakpoints and explain the overall program flow.")]
-    public string ExplainExecutionFlow()
+    public string ExplainExecutionFlow(
+        [Description("Detail level: full=complete state, changes=delta between snapshots (default), summary=location+change names only")]
+        string detail = "changes",
+        [Description("Max member expansion depth (0=flat, 1=default)")]
+        int depth = 1,
+        [Description("Start from snapshot index (default 0)")]
+        int start = 0,
+        [Description("Number of snapshots to show (0=all, default 0)")]
+        int count = 0)
     {
         var history = _store.GetHistory();
         if (history.Count == 0)
             throw new McpException("No breakpoint history available. Hit some breakpoints first — each break-mode stop is recorded automatically.");
 
-        var sb = new StringBuilder();
-        sb.AppendLine($"## Execution Trace ({history.Count} breakpoints captured)");
-        sb.AppendLine();
+        var filtered = history.Where(s => s.Index >= start).ToList();
+        if (count > 0)
+            filtered = filtered.Take(count).ToList();
 
-        foreach (var snapshot in history)
+        var sb = new StringBuilder();
+
+        // Header
+        if (count > 0 || start > 0)
+            sb.AppendLine($"Trace ({history.Count} total, showing {filtered.Count} from #{start})");
+        else
+            sb.AppendLine($"Trace ({filtered.Count} snapshots)");
+
+        DebugStateSnapshot? prevSnapshot = null;
+
+        foreach (var snapshot in filtered)
         {
             var state = snapshot.State;
             var loc = state.CurrentLocation;
@@ -323,28 +310,61 @@ public class DebugTools
             var line = loc?.Line ?? 0;
             var time = snapshot.CapturedAt.ToString("HH:mm:ss.fff");
 
-            sb.AppendLine($"### Snapshot #{snapshot.Index} — {file}:{line} `{func}()` at {time}");
-            sb.AppendLine();
+            sb.AppendLine($"#{snapshot.Index} [{time}] {func} ({file}:{line})");
 
-            if (state.Locals.Count > 0)
+            switch (detail)
             {
-                sb.AppendLine("**Locals:**");
-                FormatVariables(sb, state.Locals, indent: 0);
-                sb.AppendLine();
+                case "summary":
+                    if (prevSnapshot != null)
+                    {
+                        var summary = CompactFormatter.FormatVariableChangeSummary(
+                            prevSnapshot.State.Locals, state.Locals);
+                        sb.AppendLine(summary);
+                    }
+                    break;
+
+                case "full":
+                    if (state.Locals.Count > 0)
+                    {
+                        sb.AppendLine("[locals]");
+                        CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
+                    }
+                    if (state.CallStack.Count > 0)
+                    {
+                        sb.AppendLine("[stack]");
+                        CompactFormatter.FormatCallStack(sb, state.CallStack);
+                    }
+                    break;
+
+                case "changes":
+                default:
+                    if (prevSnapshot == null)
+                    {
+                        // First snapshot: show full state
+                        if (state.Locals.Count > 0)
+                        {
+                            sb.AppendLine("[locals]");
+                            CompactFormatter.FormatVariables(sb, state.Locals, 0, depth);
+                        }
+                        if (state.CallStack.Count > 0)
+                        {
+                            sb.AppendLine("[stack]");
+                            CompactFormatter.FormatCallStack(sb, state.CallStack);
+                        }
+                    }
+                    else
+                    {
+                        // Subsequent: show diff
+                        CompactFormatter.FormatVariableDiff(sb,
+                            prevSnapshot.State.Locals, state.Locals, depth);
+                        CompactFormatter.FormatCallStackDiff(sb,
+                            prevSnapshot.State.CallStack, state.CallStack);
+                    }
+                    break;
             }
 
-            if (state.CallStack.Count > 0)
-            {
-                sb.AppendLine("**Call Stack:**");
-                foreach (var frame in state.CallStack)
-                {
-                    sb.AppendLine($"  {frame.Index}. `{frame.FunctionName}` ({frame.Module})");
-                }
-                sb.AppendLine();
-            }
-
-            sb.AppendLine("---");
             sb.AppendLine();
+            prevSnapshot = snapshot;
         }
 
         return sb.ToString();
@@ -360,20 +380,5 @@ public class DebugTools
         if (state is null || !state.IsInBreakMode)
             throw new McpException("No debug state available or not in break mode.");
         return state;
-    }
-
-    private static void FormatVariables(StringBuilder sb, List<LocalVariable> variables, int indent)
-    {
-        var prefix = new string(' ', indent * 2);
-        foreach (var v in variables)
-        {
-            var validMarker = v.IsValidValue ? "" : " (could not evaluate)";
-            sb.AppendLine($"{prefix}- **{v.Name}** (`{v.Type}`): `{v.Value}`{validMarker}");
-
-            if (v.Members.Count > 0 && indent < 3)
-            {
-                FormatVariables(sb, v.Members, indent + 1);
-            }
-        }
     }
 }

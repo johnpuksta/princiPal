@@ -87,31 +87,24 @@ public class DebugToolsTests
 
         var result = _tools.GetDebugState();
 
-        Assert.Contains("## Debug State", result);
-        Assert.Contains("### Current Location", result);
-        Assert.Contains(@"C:\src\App.cs", result);
-        Assert.Contains("**Line**: 10", result);
-        Assert.Contains("**Function**: Run", result);
-        Assert.Contains("**Project**: TestProject", result);
-        Assert.Contains("### Local Variables", result);
-        Assert.Contains("**count** (`int`): `42`", result);
-        Assert.Contains("### Call Stack", result);
-        Assert.Contains("`Run`", result);
-        Assert.Contains("TestProject.dll", result);
+        Assert.Contains("[loc]", result);
+        Assert.Contains("@ Run (App.cs:10) [TestProject]", result);
+        Assert.Contains("[locals]", result);
+        Assert.Contains("count:int=42", result);
+        Assert.Contains("[stack]", result);
+        Assert.Contains("0: Run (App.cs:10)", result);
     }
 
     [Fact]
     public void GetDebugState_OmitsLocationSection_WhenCurrentLocationIsNull()
     {
         var state = CreateBreakModeState(location: null);
-        // Set location explicitly to null after construction
         state.CurrentLocation = null;
         _store.Update(state);
 
         var result = _tools.GetDebugState();
 
-        Assert.Contains("## Debug State", result);
-        Assert.DoesNotContain("### Current Location", result);
+        Assert.DoesNotContain("[loc]", result);
     }
 
     // =================================================================
@@ -141,10 +134,10 @@ public class DebugToolsTests
 
         var result = _tools.GetLocals();
 
-        Assert.Contains("## Local Variables", result);
-        Assert.Contains("**person** (`Person`): `{Person}`", result);
-        Assert.Contains("**Name** (`string`): `\"Alice\"`", result);
-        Assert.Contains("**Age** (`int`): `30`", result);
+        Assert.Contains("[locals]", result);
+        Assert.Contains("person:Person={Person}", result);
+        Assert.Contains(".Name:string=\"Alice\"", result);
+        Assert.Contains(".Age:int=30", result);
     }
 
     [Fact]
@@ -177,7 +170,7 @@ public class DebugToolsTests
 
         var result = _tools.GetLocals();
 
-        Assert.Contains("(could not evaluate)", result);
+        Assert.Contains("[!]", result);
     }
 
     // =================================================================
@@ -198,14 +191,10 @@ public class DebugToolsTests
 
         var result = _tools.GetCallStack();
 
-        Assert.Contains("## Call Stack", result);
-        Assert.Contains("0. `Inner` [C#]", result);
-        Assert.Contains("Module: App.dll", result);
-        Assert.Contains(@"Location: C:\src\Foo.cs:15", result);
-        Assert.Contains("1. `Outer` [C#]", result);
-        Assert.Contains(@"Location: C:\src\Bar.cs:30", result);
-        Assert.Contains("2. `ExternalCall` [C#]", result);
-        Assert.Contains("Location: (external code)", result);
+        Assert.Contains("[stack]", result);
+        Assert.Contains("0: Inner (Foo.cs:15)", result);
+        Assert.Contains("1: Outer (Bar.cs:30)", result);
+        Assert.Contains("2: ExternalCall [ext]", result);
     }
 
     [Fact]
@@ -266,7 +255,6 @@ public class DebugToolsTests
     [Fact]
     public void GetSourceContext_ReturnsFormattedSource_WithHighlightedCurrentLine()
     {
-        // Create a temporary file for this test
         var tempFile = Path.GetTempFileName() + ".cs";
         try
         {
@@ -291,7 +279,6 @@ public class DebugToolsTests
             Assert.Contains("**Function**: `TestMethod`", result);
             Assert.Contains("**Line 15**", result);
             Assert.Contains("```csharp", result);
-            // Current line should be highlighted with >>>
             Assert.Contains(">>>", result);
             Assert.Contains("// Line 15", result);
         }
@@ -332,11 +319,11 @@ public class DebugToolsTests
 
         var result = _tools.GetBreakpoints();
 
-        Assert.Contains("## Breakpoints", result);
-        Assert.Contains("**Controller.cs:50** (enabled)", result);
-        Assert.Contains("Function: `HandleRequest`", result);
-        Assert.Contains("Condition: `id > 0`", result);
-        Assert.Contains("**Service.cs:100** (disabled)", result);
+        Assert.Contains("[breakpoints]", result);
+        Assert.Contains("Controller.cs:50 (on)", result);
+        Assert.Contains("HandleRequest", result);
+        Assert.Contains("when id > 0", result);
+        Assert.Contains("Service.cs:100 (off)", result);
     }
 
     [Fact]
@@ -360,7 +347,6 @@ public class DebugToolsTests
     [Fact]
     public void GetBreakpoints_DoesNotRequireBreakMode()
     {
-        // GetBreakpoints checks _store.GetCurrentState() but does NOT require IsInBreakMode
         var state = new DebugState
         {
             IsInBreakMode = false,
@@ -373,7 +359,7 @@ public class DebugToolsTests
 
         var result = _tools.GetBreakpoints();
 
-        Assert.Contains("**Test.cs:1** (enabled)", result);
+        Assert.Contains("Test.cs:1 (on)", result);
     }
 
     // =================================================================
@@ -401,11 +387,8 @@ public class DebugToolsTests
 
         var result = _tools.GetExpressionResult();
 
-        Assert.Contains("## Expression Result", result);
-        Assert.Contains("**Expression**: `list.Count`", result);
-        Assert.Contains("**Type**: `int`", result);
-        Assert.Contains("**Value**: `3`", result);
-        Assert.Contains("**Valid**: True", result);
+        Assert.Contains("expr list.Count:int=3", result);
+        Assert.DoesNotContain("[!]", result);
     }
 
     [Fact]
@@ -426,9 +409,9 @@ public class DebugToolsTests
 
         var result = _tools.GetExpressionResult();
 
-        Assert.Contains("### Members", result);
-        Assert.Contains("**Id** (`int`): `7`", result);
-        Assert.Contains("**Label** (`string`): `\"test\"`", result);
+        Assert.Contains("expr myObj:MyClass={MyClass}", result);
+        Assert.Contains(".Id:int=7", result);
+        Assert.Contains(".Label:string=\"test\"", result);
     }
 
     // =================================================================
@@ -447,7 +430,6 @@ public class DebugToolsTests
             {
                 new() { Index = 0, FunctionName = "Calculate", Module = "App.dll", Language = "C#", FilePath = @"C:\src\Calc.cs", Line = 5 }
             });
-        // Use a non-existent file so GetSourceContext falls back gracefully
         state.CurrentLocation = new SourceLocation
         {
             FilePath = @"C:\nonexistent\Calc.cs",
@@ -459,18 +441,14 @@ public class DebugToolsTests
 
         var result = _tools.ExplainCurrentState();
 
-        // Source context should still contribute (returns "Source file not accessible" rather than throwing)
         Assert.Contains("Source file not accessible", result);
-        // Locals should be present
-        Assert.Contains("**x** (`int`): `10`", result);
-        // Call stack should be present
-        Assert.Contains("`Calculate`", result);
+        Assert.Contains("x:int=10", result);
+        Assert.Contains("0: Calculate (Calc.cs:5)", result);
     }
 
     [Fact]
     public void ExplainCurrentState_ThrowsMcpException_WhenAllSectionsEmpty()
     {
-        // No state at all - all three sub-calls will throw, resulting in an empty string
         var ex = Assert.Throws<McpException>(() => _tools.ExplainCurrentState());
 
         Assert.Contains("No debug state available", ex.Message);
@@ -510,8 +488,8 @@ public class DebugToolsTests
         Assert.Contains("2 snapshots", result);
         Assert.Contains("#0", result);
         Assert.Contains("#1", result);
-        Assert.Contains("`MethodA`", result);
-        Assert.Contains("`MethodB`", result);
+        Assert.Contains("MethodA", result);
+        Assert.Contains("MethodB", result);
         Assert.Contains("A.cs:10", result);
         Assert.Contains("B.cs:20", result);
         Assert.Contains("1 locals", result);
@@ -546,14 +524,12 @@ public class DebugToolsTests
 
         var result = _tools.GetSnapshot(0);
 
-        Assert.Contains("## Snapshot #0", result);
-        Assert.Contains("### Location", result);
-        Assert.Contains(@"C:\src\File.cs", result);
-        Assert.Contains("**Function**: DoWork", result);
-        Assert.Contains("### Local Variables", result);
-        Assert.Contains("**count** (`int`): `5`", result);
-        Assert.Contains("### Call Stack", result);
-        Assert.Contains("`DoWork`", result);
+        Assert.Contains("#0", result);
+        Assert.Contains("@ DoWork (File.cs:42) [App]", result);
+        Assert.Contains("[locals]", result);
+        Assert.Contains("count:int=5", result);
+        Assert.Contains("[stack]", result);
+        Assert.Contains("0: DoWork (File.cs:42)", result);
     }
 
     // =================================================================
@@ -596,20 +572,24 @@ public class DebugToolsTests
 
         var result = _tools.ExplainExecutionFlow();
 
-        Assert.Contains("Execution Trace (2 breakpoints captured)", result);
-        Assert.Contains("Snapshot #0", result);
-        Assert.Contains("Snapshot #1", result);
-        Assert.Contains("`Begin()`", result);
-        Assert.Contains("`Process()`", result);
-        Assert.Contains("**input** (`string`): `\"hello\"`", result);
-        Assert.Contains("**input** (`string`): `\"HELLO\"`", result);
-        Assert.Contains("**processed** (`bool`): `true`", result);
+        // Default detail=changes: first snapshot full, second shows diff
+        Assert.Contains("Trace (2 snapshots)", result);
+        Assert.Contains("#0", result);
+        Assert.Contains("#1", result);
+        Assert.Contains("Begin (Start.cs:5)", result);
+        Assert.Contains("Process (Middle.cs:15)", result);
+        // First snapshot: full locals
+        Assert.Contains("input:string=\"hello\"", result);
+        // Second snapshot: diff
+        Assert.Contains("[changed]", result);
+        Assert.Contains("input:string=\"HELLO\" (was \"hello\")", result);
+        Assert.Contains("[new]", result);
+        Assert.Contains("processed:bool=true", result);
     }
 
     [Fact]
     public void ExplainCurrentState_ReturnsPartialContent_WhenSomeSectionsFail()
     {
-        // State with locals but no location and empty call stack
         var state = CreateBreakModeState(
             locals: new List<LocalVariable>
             {
@@ -621,10 +601,7 @@ public class DebugToolsTests
 
         var result = _tools.ExplainCurrentState();
 
-        // GetSourceContext throws (no location) - swallowed by try/catch
-        // GetLocals returns content
-        Assert.Contains("**flag** (`bool`): `true`", result);
-        // GetCallStack returns "Call stack is empty." which is still content
+        Assert.Contains("flag:bool=true", result);
         Assert.Contains("Call stack is empty.", result);
     }
 }
