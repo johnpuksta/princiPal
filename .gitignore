@@ -38,5 +38,4 @@ TestResults/
 node_modules/
 out/
 *.tsbuildinfo
-package-lock.json
 src/PrinciPal.VsCodeExtension/Server/
