@@ -8,10 +8,9 @@ public partial class Program
         var port = CliArgs.ParsePort(args);
 
         var builder = WebApplication.CreateBuilder(args);
-        builder.Services.AddPrinciPalServices();
+        builder.Services.AddPrinciPalServices(builder.Configuration);
 
         var app = builder.Build();
-        app.UseIdleShutdownWatchdog();
         app.MapPrinciPalEndpoints();
 
         app.Run($"http://localhost:{port}");

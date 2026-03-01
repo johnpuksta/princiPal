@@ -1,18 +1,36 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
+using Microsoft.Extensions.DependencyInjection;
 using PrinciPal.Domain.ValueObjects;
+using PrinciPal.Server.Configuration;
 
 namespace PrinciPal.Integration.Tests;
 
-public class McpServerIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+public class PrinciPalWebApplicationFactory : WebApplicationFactory<Program>
+{
+    protected override void ConfigureWebHost(IWebHostBuilder builder)
+    {
+        builder.ConfigureServices(services =>
+        {
+            services.Configure<IdleShutdownOptions>(opts =>
+            {
+                opts.InitialConnectionTimeoutSeconds = 3600;
+                opts.GracePeriodSeconds = 3600;
+            });
+        });
+    }
+}
+
+public class McpServerIntegrationTests : IClassFixture<PrinciPalWebApplicationFactory>
 {
     private readonly HttpClient _client;
 
     private const string TestSessionId = "a1b2c3d4";
 
-    public McpServerIntegrationTests(WebApplicationFactory<Program> factory)
+    public McpServerIntegrationTests(PrinciPalWebApplicationFactory factory)
     {
         _client = factory.CreateClient();
     }

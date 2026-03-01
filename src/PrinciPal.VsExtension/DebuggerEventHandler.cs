@@ -58,6 +58,38 @@ namespace PrinciPal.VsExtension
             _debuggerEvents.OnEnterBreakMode += OnEnterBreakMode;
             _debuggerEvents.OnEnterDesignMode += OnEnterDesignMode;
             _debuggerEvents.OnContextChanged += OnContextChanged;
+
+            // Register session immediately so the server knows this IDE is alive
+            _ = RegisterSessionAsync();
+        }
+
+        private async Task RegisterSessionAsync()
+        {
+            try
+            {
+                await Task.Run(async () =>
+                {
+                    try
+                    {
+                        var response = await _httpClient.PostAsync(
+                            $"/api/sessions/{Uri.EscapeDataString(_sessionId)}?{_sessionQueryParams}",
+                            null);
+                        Debug.WriteLine($"PrinciPal: Registered session '{_sessionId}'. Status: {response.StatusCode}");
+                    }
+                    catch (HttpRequestException ex)
+                    {
+                        Debug.WriteLine($"PrinciPal: MCP server not reachable at {_serverUrl}. {ex.Message}");
+                    }
+                    catch (TaskCanceledException)
+                    {
+                        Debug.WriteLine("PrinciPal: Register request timed out.");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"PrinciPal: Error registering session: {ex.Message}");
+            }
         }
 
         private void OnEnterBreakMode(dbgEventReason reason, ref dbgExecutionAction executionAction)

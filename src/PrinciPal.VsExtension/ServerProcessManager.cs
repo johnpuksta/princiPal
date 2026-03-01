@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Reflection;
+using System.Threading;
 
 namespace PrinciPal.VsExtension
 {
@@ -36,8 +37,45 @@ namespace PrinciPal.VsExtension
                 if (_disposed) return;
                 _port = port;
                 _restartCount = 0;
+
+                var lockHandle = ServerLockFile.TryAcquire(port);
+                if (lockHandle == null)
+                {
+                    // Another extension instance is starting the server — wait for it
+                    _log("Another instance is starting the MCP server. Waiting for health...");
+                    if (WaitForHealth(port, TimeSpan.FromSeconds(10)))
+                    {
+                        _log("MCP server is ready (started by another instance).");
+                        return;
+                    }
+                    _log("Timed out waiting for server started by another instance.");
+                    return;
+                }
+
                 StartProcess();
+
+                if (_process != null && !_process.HasExited)
+                {
+                    ServerLockFile.WriteAndRelease(lockHandle, _process.Id, port);
+                }
+                else
+                {
+                    lockHandle.Dispose();
+                    ServerLockFile.Remove(port);
+                }
             }
+        }
+
+        private static bool WaitForHealth(int port, TimeSpan timeout)
+        {
+            var deadline = DateTime.UtcNow + timeout;
+            while (DateTime.UtcNow < deadline)
+            {
+                if (IsPrinciPalServerRunning(port))
+                    return true;
+                Thread.Sleep(500);
+            }
+            return false;
         }
 
         private void StartProcess()
@@ -165,45 +203,10 @@ namespace PrinciPal.VsExtension
                 if (_disposed) return;
                 _disposed = true;
 
-                if (_process != null && !_process.HasExited)
-                {
-                    // Only kill the server if no other sessions are using it.
-                    // The idle-shutdown watchdog will clean it up if all sessions leave.
-                    var hasOtherSessions = false;
-                    try
-                    {
-                        var request = WebRequest.CreateHttp($"http://localhost:{_port}/api/sessions");
-                        request.Method = "GET";
-                        request.Timeout = 2000;
-                        using (var response = (HttpWebResponse)request.GetResponse())
-                        using (var reader = new System.IO.StreamReader(response.GetResponseStream()))
-                        {
-                            var body = reader.ReadToEnd();
-                            // If there are remaining sessions (array not empty), don't kill
-                            hasOtherSessions = body.Contains("sessionId") || body.Contains("SessionId");
-                        }
-                    }
-                    catch { /* can't reach server, safe to kill */ }
-
-                    if (!hasOtherSessions)
-                    {
-                        try
-                        {
-                            _process.Kill();
-                            _process.WaitForExit(5000);
-                            _log("MCP server stopped.");
-                        }
-                        catch (Exception ex)
-                        {
-                            _log($"Error stopping MCP server: {ex.Message}");
-                        }
-                    }
-                    else
-                    {
-                        _log("Other sessions still active — leaving MCP server running.");
-                    }
-                }
-
+                // Ambassador pattern: the server's Quartz watchdog is the sole authority
+                // on shutdown. Extensions just detach — the server will self-terminate
+                // after all sessions deregister and the grace period expires.
+                _log("Detaching from MCP server.");
                 _process?.Dispose();
                 _process = null;
             }

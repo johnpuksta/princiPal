@@ -10,6 +10,12 @@ internal static class SessionEndpoints
 
         group.MapGet("/", (ISessionManager mgr) => Results.Ok(mgr.GetAllSessions()));
 
+        group.MapPost("/{sessionId}", (ISessionManager mgr, string sessionId, string? name, string? path) =>
+        {
+            mgr.GetOrCreateSession(sessionId, name, path);
+            return Results.Ok();
+        });
+
         group.MapDelete("/{sessionId}", (ISessionManager mgr, string sessionId) =>
         {
             mgr.RemoveSession(sessionId);
