@@ -62,6 +62,14 @@ export class ServerProcessManager {
 
         if (this._process && !this._process.killed) {
             ServerLockFile.writeAndRelease(lockResult.value, this._process.pid!, port);
+            // Wait for the server to be ready before returning so that
+            // callers (e.g. session registration) can use it immediately.
+            const healthy = await this.waitForHealth(port, 10_000);
+            if (healthy) {
+                this._logger.log("MCP server is ready.");
+            } else {
+                this._logger.log("Timed out waiting for MCP server to become healthy.");
+            }
         } else {
             lockResult.value.close();
             ServerLockFile.remove(port);
@@ -80,7 +88,7 @@ export class ServerProcessManager {
 
         this._process = spawn(command, args, {
             stdio: ["ignore", "pipe", "pipe"],
-            detached: false,
+            detached: true,
         });
 
         this._process.stdout?.on("data", (data: Buffer) => {
@@ -94,6 +102,11 @@ export class ServerProcessManager {
         this._process.on("exit", (code) => {
             this.onProcessExited(code);
         });
+
+        // Detach so the server survives VS Code exiting — matches C# Process.Start
+        // behavior where the server is an independent process. The Quartz watchdog
+        // is the sole authority on server shutdown.
+        this._process.unref();
 
         this._logger.log(
             `MCP server started (PID ${this._process.pid}) on http://localhost:${this._port}/`

@@ -82,29 +82,15 @@ export async function activate(
         vscode.debug.registerDebugAdapterTrackerFactory("*", trackerFactory)
     );
 
-    // Session lifecycle handlers
-    context.subscriptions.push(
-        vscode.debug.onDidStartDebugSession(async () => {
-            const result = await coordinator!.register();
-            if (!result.ok) {
-                logger!.log(result.error.description);
-            }
-        })
-    );
+    // Register session eagerly on activation (matches VS extension behavior)
+    const regResult = await coordinator.register();
+    if (!regResult.ok) {
+        logger.log(regResult.error.description);
+    }
 
-    context.subscriptions.push(
-        vscode.debug.onDidTerminateDebugSession(async () => {
-            const result = await coordinator!.deregister();
-            if (!result.ok) {
-                logger!.log(result.error.description);
-            }
-        })
-    );
-
-    // Cleanup on deactivate
+    // Cleanup on deactivate — deregister must happen before publisher is disposed.
     context.subscriptions.push({
         dispose() {
-            publisher?.dispose();
             processManager?.dispose();
             logger?.dispose();
         },
@@ -115,10 +101,14 @@ export async function activate(
 }
 
 export async function deactivate(): Promise<void> {
-    // Best-effort deregistration (same as VS extension dispose)
+    // Best-effort deregistration with bounded wait (matches VS extension's 3s timeout).
+    // Must complete before publisher is disposed, since dispose() aborts in-flight requests.
     try {
-        await coordinator?.deregister();
+        const timeout = new Promise<void>((resolve) => setTimeout(resolve, 3000));
+        await Promise.race([coordinator?.deregister(), timeout]);
     } catch {
         // best-effort
+    } finally {
+        publisher?.dispose();
     }
 }
