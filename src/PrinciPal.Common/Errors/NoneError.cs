@@ -1,3 +1,5 @@
+using PrinciPal.Common.Abstractions;
+
 namespace PrinciPal.Common.Errors;
 
 internal sealed class NoneError : ErrorBase

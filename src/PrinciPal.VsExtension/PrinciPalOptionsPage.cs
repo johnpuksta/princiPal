@@ -1,7 +1,7 @@
 using System.ComponentModel;
 using Microsoft.VisualStudio.Shell;
 
-namespace PrinciPal.Extension
+namespace PrinciPal.VsExtension
 {
     public class PrinciPalOptionsPage : DialogPage
     {

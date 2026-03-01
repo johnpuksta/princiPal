@@ -4,7 +4,7 @@ using System.IO;
 using System.Net;
 using System.Reflection;
 
-namespace PrinciPal.Extension
+namespace PrinciPal.VsExtension
 {
     public sealed class ServerProcessManager : IDisposable
     {

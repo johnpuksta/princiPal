@@ -1,3 +1,4 @@
+using PrinciPal.Common.Abstractions;
 using PrinciPal.Common.Errors;
 
 namespace PrinciPal.Common.Results;

@@ -5,8 +5,8 @@
 
   <PropertyGroup>
     <TargetFramework>net48</TargetFramework>
-    <RootNamespace>PrinciPal.Extension</RootNamespace>
-    <AssemblyName>PrinciPal.Extension</AssemblyName>
+    <RootNamespace>PrinciPal.VsExtension</RootNamespace>
+    <AssemblyName>PrinciPal.VsExtension</AssemblyName>
     <LangVersion>latest</LangVersion>
     <Nullable>enable</Nullable>
 

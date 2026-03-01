@@ -11,7 +11,7 @@ using Microsoft.VisualStudio.Shell;
 using PrinciPal.Domain.ValueObjects;
 using Task = System.Threading.Tasks.Task;
 
-namespace PrinciPal.Extension
+namespace PrinciPal.VsExtension
 {
     /// <summary>
     /// Subscribes to VS debugger events and pushes debug state to the MCP server.

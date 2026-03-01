@@ -1,4 +1,4 @@
-namespace PrinciPal.Common.Errors;
+namespace PrinciPal.Common.Abstractions;
 
 public abstract class ErrorBase : IError, IEquatable<ErrorBase>
 {

@@ -4,7 +4,7 @@ using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
 using Microsoft.VisualStudio.Shell.Interop;
 
-namespace PrinciPal.Extension
+namespace PrinciPal.VsExtension
 {
     public sealed class OutputLogger
     {

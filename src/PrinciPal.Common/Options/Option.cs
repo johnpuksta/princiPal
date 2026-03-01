@@ -76,7 +76,7 @@ public readonly struct Option<T> : IEquatable<Option<T>>
     /// <summary>
     /// Converts to a Result, using the provided error if None.
     /// </summary>
-    public Results.Result<T> ToResult(Errors.IError error) =>
+    public Results.Result<T> ToResult(Abstractions.IError error) =>
         _hasValue
             ? Results.Result<T>.Success(_value!)
             : Results.Result<T>.Failure(error);

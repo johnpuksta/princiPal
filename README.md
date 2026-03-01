@@ -16,7 +16,7 @@ Two components work together:
 
 | Component | Runtime | Role |
 |---|---|---|
-| **Extension** (VSIX) | .NET Framework 4.8 | Reads debugger state via EnvDTE, pushes to MCP server on breakpoint |
+| **VsExtension** (VSIX) | .NET Framework 4.8 | Reads debugger state via EnvDTE, pushes to MCP server on breakpoint |
 | **Server** | .NET 10 (ASP.NET Core) | Receives state, exposes MCP tools for AI editors |
 
 ## MCP Tools
@@ -71,7 +71,7 @@ The server starts on `http://localhost:9229`.
 Build and install the VSIX:
 ```bash
 # Build the VSIX project
-cd src/PrinciPal.Extension
+cd src/PrinciPal.VsExtension
 dotnet build
 
 # Install the .vsix file from the output directory into VS 2022
@@ -102,7 +102,7 @@ princiPal/
   src/
     PrinciPal.Contracts/      # Shared DTOs (netstandard2.0)
     PrinciPal.Server/      # MCP server (ASP.NET Core)
-    PrinciPal.Extension/      # VS 2022 extension (VSIX)
+    PrinciPal.VsExtension/    # VS 2022 extension (VSIX)
   tests/
     PrinciPal.Server.Tests/  # Unit + integration tests
 ```

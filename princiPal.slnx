@@ -5,7 +5,7 @@
     <Project Path="src/PrinciPal.Application/PrinciPal.Application.csproj" />
     <Project Path="src/PrinciPal.Infrastructure/PrinciPal.Infrastructure.csproj" />
     <Project Path="src/PrinciPal.Server/PrinciPal.Server.csproj" />
-    <Project Path="src/PrinciPal.Extension/PrinciPal.Extension.csproj" />
+    <Project Path="src/PrinciPal.VsExtension/PrinciPal.VsExtension.csproj" />
   </Folder>
   <Folder Name="/tests/unit/">
     <Project Path="tests/unit/PrinciPal.Domain.Tests/PrinciPal.Domain.Tests.csproj" />
