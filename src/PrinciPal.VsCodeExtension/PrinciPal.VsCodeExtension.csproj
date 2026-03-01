@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.Build.NoTargets/3.7.56">
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+  </PropertyGroup>
+
+  <Target Name="NpmInstall" BeforeTargets="Build">
+    <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+  <Target Name="NpmBuild" AfterTargets="NpmInstall">
+    <Exec Command="npm run compile" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+
+  <!-- MCP server bundling: same pattern as PrinciPal.VsExtension.csproj -->
+  <PropertyGroup>
+    <McpServerProject>$(MSBuildThisFileDirectory)..\PrinciPal.Server\PrinciPal.Server.csproj</McpServerProject>
+    <McpServerPublishDir>$(MSBuildProjectDirectory)\Server\</McpServerPublishDir>
+  </PropertyGroup>
+
+  <!-- Debug only: write the .devproject marker so ServerProcessManager can use dotnet run -->
+  <Target Name="WriteMcpServerDevMarker" AfterTargets="NpmBuild" Condition="'$(Configuration)' == 'Debug'">
+    <MakeDir Directories="$(MSBuildProjectDirectory)\out\Server" />
+    <WriteLinesToFile File="$(MSBuildProjectDirectory)\out\Server\.devproject" Lines="$(McpServerProject)" Overwrite="true" />
+  </Target>
+
+  <!-- Release only: publish the server as a self-contained single-file exe -->
+  <Target Name="PublishMcpServer" AfterTargets="NpmBuild" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration) -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o &quot;$(McpServerPublishDir)&quot;" />
+  </Target>
+
+  <!-- Release only: package as a VS Code .vsix after server is published -->
+  <Target Name="VscePackage" AfterTargets="PublishMcpServer" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="npx vsce package --no-dependencies" WorkingDirectory="$(MSBuildProjectDirectory)" />
+  </Target>
+</Project>

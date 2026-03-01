@@ -1,0 +1,60 @@
+{
+  "name": "principal-vscode",
+  "displayName": "princiPal",
+  "description": "Bridges VS Code/Cursor debugger state to MCP-compatible AI editors for AI-assisted debugging.",
+  "version": "1.0.0",
+  "publisher": "princiPal",
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Debuggers"
+  ],
+  "keywords": [
+    "debugger",
+    "AI",
+    "MCP",
+    "Claude",
+    "Cursor"
+  ],
+  "activationEvents": [
+    "onDebug"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "princiPal",
+      "properties": {
+        "princiPal.port": {
+          "type": "number",
+          "default": 9229,
+          "description": "Port for the MCP server. All editor instances share this single port."
+        },
+        "princiPal.autoStart": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically start the MCP server when a debug session begins."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "bundle": "node esbuild.js",
+    "lint": "tsc --noEmit",
+    "vscode:prepublish": "node esbuild.js --production",
+    "package": "vsce package --no-dependencies",
+    "pretest": "npm run compile",
+    "test": "echo No in-tree tests — see tests/unit/PrinciPal.VsCodeExtension.Tests"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/test-cli": "^0.0.10",
+    "@vscode/test-electron": "^2.3.8",
+    "@vscode/vsce": "^3.2.0",
+    "esbuild": "^0.20.0",
+    "typescript": "^5.3.3"
+  }
+}
