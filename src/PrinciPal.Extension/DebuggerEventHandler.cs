@@ -26,15 +26,16 @@ namespace PrinciPal.Extension
         // CRITICAL: Must be stored as a field to prevent COM RCW garbage collection
         private DebuggerEvents? _debuggerEvents;
 
-        private const string McpServerBaseUrl = "http://localhost:9229";
+        private readonly string _serverUrl;
 
-        public DebuggerEventHandler(DTE2 dte, AsyncPackage package)
+        public DebuggerEventHandler(DTE2 dte, AsyncPackage package, int port)
         {
             _dte = dte;
             _package = package;
+            _serverUrl = $"http://localhost:{port}";
             _httpClient = new HttpClient
             {
-                BaseAddress = new Uri(McpServerBaseUrl),
+                BaseAddress = new Uri(_serverUrl),
                 Timeout = TimeSpan.FromSeconds(5)
             };
             _jsonOptions = new JsonSerializerOptions
@@ -88,7 +89,7 @@ namespace PrinciPal.Extension
                     }
                     catch (HttpRequestException ex)
                     {
-                        Debug.WriteLine($"PrinciPal: MCP server not reachable at {McpServerBaseUrl}. {ex.Message}");
+                        Debug.WriteLine($"PrinciPal: MCP server not reachable at {_serverUrl}. {ex.Message}");
                     }
                     catch (TaskCanceledException)
                     {
@@ -167,7 +168,7 @@ namespace PrinciPal.Extension
                     }
                     catch (HttpRequestException ex)
                     {
-                        Debug.WriteLine($"PrinciPal: MCP server not reachable at {McpServerBaseUrl}. {ex.Message}");
+                        Debug.WriteLine($"PrinciPal: MCP server not reachable at {_serverUrl}. {ex.Message}");
                     }
                     catch (TaskCanceledException)
                     {

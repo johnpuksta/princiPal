@@ -59,4 +59,26 @@
   <!-- Import VSSDK targets AFTER SDK targets for VSIX packaging, deployment, and F5 debugging -->
   <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" />
 
+  <!-- MCP server bundling: Release publishes self-contained exe, Debug uses dotnet run -->
+  <PropertyGroup>
+    <McpServerProject>$(MSBuildThisFileDirectory)..\PrinciPal.McpServer\PrinciPal.McpServer.csproj</McpServerProject>
+    <McpServerPublishDir>$(OutputPath)Server\</McpServerPublishDir>
+  </PropertyGroup>
+
+  <!-- Release only: publish the server as a self-contained single-file exe into the VSIX -->
+  <Target Name="PublishMcpServer" BeforeTargets="GetVsixSourceItems" Condition="'$(Configuration)' == 'Release'">
+    <Exec Command="dotnet publish &quot;$(McpServerProject)&quot; -c $(Configuration) -r win-x64 --self-contained -p:PublishSingleFile=true -p:IncludeNativeLibrariesForSelfExtract=true -o &quot;$(McpServerPublishDir)&quot;" />
+    <ItemGroup>
+      <VSIXSourceItem Include="$(McpServerPublishDir)**\*">
+        <VSIXSubPath>Server\</VSIXSubPath>
+      </VSIXSourceItem>
+    </ItemGroup>
+  </Target>
+
+  <!-- Debug only: write the McpServer project path so the process manager can use dotnet run -->
+  <Target Name="WriteMcpServerDevMarker" AfterTargets="CopyFilesToOutputDirectory" Condition="'$(Configuration)' == 'Debug'">
+    <MakeDir Directories="$(OutputPath)Server" />
+    <WriteLinesToFile File="$(OutputPath)Server\.devproject" Lines="$(McpServerProject)" Overwrite="true" />
+  </Target>
+
 </Project>

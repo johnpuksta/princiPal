@@ -1,4 +1,42 @@
+using System.Diagnostics;
 using PrinciPal.McpServer.Services;
+
+// Parse CLI args
+var port = 9229;
+var parentPid = 0;
+
+for (int i = 0; i < args.Length - 1; i++)
+{
+    if (args[i] == "--port" && int.TryParse(args[i + 1], out var p))
+        port = p;
+    else if (args[i] == "--parent-pid" && int.TryParse(args[i + 1], out var pid))
+        parentPid = pid;
+}
+
+// Parent-pid watchdog: exit if the parent process (e.g. VS) dies
+if (parentPid > 0)
+{
+    var watchdogThread = new Thread(() =>
+    {
+        while (true)
+        {
+            Thread.Sleep(5000);
+            try
+            {
+                Process.GetProcessById(parentPid);
+            }
+            catch
+            {
+                Environment.Exit(0);
+            }
+        }
+    })
+    {
+        IsBackground = true,
+        Name = "ParentPidWatchdog"
+    };
+    watchdogThread.Start();
+}
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -52,7 +90,7 @@ app.MapGet("/api/health", () => Results.Ok(new { status = "running" }));
 // MCP endpoint (SSE transport)
 app.MapMcp();
 
-app.Run("http://localhost:9229");
+app.Run($"http://localhost:{port}");
 
 // Needed for integration tests with WebApplicationFactory
 public partial class Program { }
