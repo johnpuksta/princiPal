@@ -19,6 +19,7 @@ jobs:
     name: Create GitHub Release
     needs: build
     runs-on: ubuntu-latest
+    environment: release
 
     steps:
       - name: Download VS Extension VSIX
