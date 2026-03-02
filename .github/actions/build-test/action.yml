@@ -46,7 +46,7 @@ runs:
       run: |
         VERSION="${{ inputs.version }}"
         if [ -n "$VERSION" ]; then
-          dotnet build --no-restore -c Release /p:Version="$VERSION"
+          dotnet build --no-restore -c Release -p:Version="$VERSION"
         else
           dotnet build --no-restore -c Release
         fi
