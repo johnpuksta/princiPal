@@ -4,6 +4,19 @@ on:
   push:
   pull_request:
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  CI: true
+
 jobs:
   ci:
-    uses: ./.github/workflows/build.yml
+    name: Build & Test
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build & Test
+        uses: ./.github/actions/build-test
