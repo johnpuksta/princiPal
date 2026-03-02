@@ -13,7 +13,8 @@
     <!-- VSIX packaging - tells MSBuild to produce a .vsix, not a class library -->
     <VsixType>v3</VsixType>
     <CreateVsixContainer>true</CreateVsixContainer>
-    <DeployExtension Condition="'$(CI)' == 'true'">false</DeployExtension>
+    <DeployExtension Condition="'$(CI)' == 'true' or '$(BuildingInsideVisualStudio)' != 'true'">false</DeployExtension>
+    <DebugType>full</DebugType>
     <GeneratePkgDefFile>true</GeneratePkgDefFile>
     <UseCodebase>true</UseCodebase>
     <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
