@@ -19,6 +19,10 @@ graph LR
         DBG[Debugger] -->|COM / EnvDTE| EXT[VSIX Extension]
     end
 
+    subgraph VSC["VS Code / Cursor"]
+        DBG2[Debugger] -->|DAP| EXT2[princiPal Extension]
+    end
+
     subgraph SRV["MCP Server :9229"]
         API[REST API] --> SM[Session Manager]
         SM --> S1[Session Store]
@@ -29,13 +33,14 @@ graph LR
 
     subgraph AI["AI Editor"]
         CC[Claude Code]
-        VS2[VS Code + Copilot]
+        CP[VS Code + Copilot]
         CU[Cursor]
     end
 
     EXT -->|"HTTP POST<br/>debug state"| API
+    EXT2 -->|"HTTP POST<br/>debug state"| API
     MCP <-->|"MCP / SSE"| CC
-    MCP <-->|"MCP / SSE"| VS2
+    MCP <-->|"MCP / SSE"| CP
     MCP <-->|"MCP / SSE"| CU
 
     classDef tool fill:#5b21b6,color:#fff,stroke:#7c3aed
