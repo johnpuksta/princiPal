@@ -1,15 +1,15 @@
 # princiPal
 
-A principal engineer in your pocket. princiPal bridges your Visual Studio 2022 debugger to AI-powered editors (VS Code, Cursor, Claude Code) via the [Model Context Protocol](https://modelcontextprotocol.io/) — giving you an always-available expert that understands your runtime state and helps you reason through complex behavior.
+A principal engineer in your pocket. princiPal bridges your Visual Studio 2022 debugger to AI-powered editors (VS Code, Cursor, Claude Code) via the [Model Context Protocol](https://modelcontextprotocol.io/), giving you an always-available expert that understands your runtime state and helps you reason through complex behavior.
 
 ### Features
 
-- ✅ **Live debug state streaming** — locals, call stack, source context pushed on every breakpoint hit
-- ✅ **Breakpoint history & execution flow** — rolling snapshots with diffs across breakpoints
-- ✅ **Multi-session support** — debug multiple VS solutions simultaneously, query any by name
-- ✅ **Self-managed server** — VSIX bundles and auto-starts the MCP server, idle watchdog handles shutdown
-- ✅ **Token-efficient output** — compact formatting designed for LLM consumption
-- ✅ **11 MCP tools** — from `get_locals` to `explain_execution_flow`, purpose-built for AI-assisted debugging
+- ✅ **Live debug state streaming**: locals, call stack, and source context pushed on every breakpoint hit
+- ✅ **Breakpoint history & execution flow**: rolling snapshots with diffs across breakpoints
+- ✅ **Multi-session support**: debug multiple VS solutions simultaneously and query any by name
+- ✅ **Self-managed server**: the VSIX bundles and auto-starts the MCP server; idle watchdog handles shutdown
+- ✅ **Token-efficient output**: compact formatting designed for LLM consumption
+- ✅ **11 MCP tools**: from `get_locals` to `explain_execution_flow`, purpose-built for AI-assisted debugging
 
 ## How It Works
 
@@ -48,17 +48,17 @@ graph LR
 
 **On every breakpoint hit**, the extension reads debugger state through the VS COM model and pushes it to the MCP server. The server stores snapshots in a rolling history and exposes them as MCP tools that any compatible editor can call.
 
-The VSIX bundles the server as a self-contained executable — install the extension and everything runs automatically.
+The VSIX bundles the server as a self-contained executable. Install the extension and everything runs automatically.
 
 ## Use Cases
 
-**AI-assisted breakpoint debugging** — Step through breakpoints in VS while Claude Code or Cursor explains each state, identifies patterns in variable changes, and suggests what to investigate next.
+**AI-assisted breakpoint debugging.** Step through breakpoints in VS while Claude Code or Cursor explains each state, identifies patterns in variable changes, and suggests what to investigate next.
 
-**Execution flow analysis** — Set breakpoints in a loop or recursive function, step through several iterations, then ask your AI editor to `explain_execution_flow` to see how state evolved across all snapshots with diffs highlighted.
+**Execution flow analysis.** Set breakpoints in a loop or recursive function, step through several iterations, then ask your AI editor to `explain_execution_flow` to see how state evolved across all snapshots with diffs highlighted.
 
-**Multi-session debugging** — Debug multiple VS solutions simultaneously. Each VS instance registers its own session; AI tools can query any of them by name.
+**Multi-session debugging.** Debug multiple VS solutions simultaneously. Each VS instance registers its own session; AI tools can query any of them by name.
 
-**Bug root-cause analysis** — Hit a breakpoint where something is wrong, ask the AI to `explain_current_state`, and get an instant read on locals, call stack context, and surrounding source code — without copy-pasting anything.
+**Bug root-cause analysis.** Hit a breakpoint where something is wrong, ask the AI to `explain_current_state`, and get an instant read on locals, call stack context, and surrounding source code without copy-pasting anything.
 
 ## Quick Start
 
@@ -110,7 +110,7 @@ The AI calls MCP tools behind the scenes to read your locals, call stack, and so
 | `get_source_context` | ~30 lines of source around the breakpoint |
 | `get_breakpoints` | All breakpoints with conditions and hit counts |
 | `get_expression_result` | Result of the last Watch/Immediate expression |
-| `explain_current_state` | Combined source + locals + stack — ideal for AI |
+| `explain_current_state` | Combined source + locals + stack, ideal for AI |
 | `get_breakpoint_history` | Summary of all captured snapshots |
 | `get_snapshot` | Full state for a specific snapshot by index |
 | `explain_execution_flow` | All snapshots as an execution trace with diffs |
@@ -124,19 +124,19 @@ src/
   PrinciPal.Application/       # IDebugQueryService, ISessionManager, CompactFormatter
   PrinciPal.Infrastructure/    # SessionManager, DebugQueryService, ThreadSafeDebugStateStore
   PrinciPal.Server/            # ASP.NET Core host, MCP tool definitions, Quartz idle watchdog
-  PrinciPal.VsExtension/       # VS 2022 VSIX — COM/DTE adapters, HTTP publisher
-  PrinciPal.VsCodeExtension/   # VS Code/Cursor — TypeScript, DAP-based, same HTTP API
+  PrinciPal.VsExtension/       # VS 2022 VSIX: COM/DTE adapters, HTTP publisher
+  PrinciPal.VsCodeExtension/   # VS Code/Cursor: TypeScript, DAP-based, same HTTP API
 ```
 
 ### Key Design Decisions
 
-**Adapter + Coordinator pattern** — The extension isolates COM complexity behind `IDebuggerReader` and HTTP behind `IDebugStatePublisher`. A `DebugEventCoordinator` orchestrates reads and publishes, making the core logic testable without VS running.
+**Adapter + Coordinator pattern.** The extension isolates COM complexity behind `IDebuggerReader` and HTTP behind `IDebugStatePublisher`. A `DebugEventCoordinator` orchestrates reads and publishes, making the core logic testable without VS running.
 
-**Ambassador pattern for shutdown** — The extension never force-kills the server. It deregisters its session and detaches. The server's Quartz idle watchdog is the sole authority on shutdown — it self-terminates after a grace period when all sessions disconnect.
+**Ambassador pattern for shutdown.** The extension never force-kills the server. It deregisters its session and detaches. The server's Quartz idle watchdog is the sole authority on shutdown, self-terminating after a grace period when all sessions disconnect.
 
-**Rolling snapshot history** — Each breakpoint hit is stored as a timestamped snapshot (up to 50 by default). Tools like `explain_execution_flow` diff consecutive snapshots to show how state changed across breakpoints.
+**Rolling snapshot history.** Each breakpoint hit is stored as a timestamped snapshot (up to 50 by default). Tools like `explain_execution_flow` diff consecutive snapshots to show how state changed across breakpoints.
 
-**Token-efficient formatting** — Output is formatted as `name:type=value` with dot-notation for nesting, designed to minimize token usage when consumed by LLMs.
+**Token-efficient formatting.** Output is formatted as `name:type=value` with dot-notation for nesting, designed to minimize token usage when consumed by LLMs.
 
 ## Building & Testing
 
@@ -148,9 +148,9 @@ dotnet build -c Release     # Release build (bundles server into both VSIX packa
 
 ### Local Development
 
-**Debug mode** — extensions use `dotnet run` against the sibling `PrinciPal.Server` project via a `.devproject` marker file. No bundled exe needed.
+**Debug mode.** Extensions use `dotnet run` against the sibling `PrinciPal.Server` project via a `.devproject` marker file. No bundled exe needed.
 
-**Release mode** — both extension csproj files `dotnet publish` the server as a self-contained exe and package it into their respective VSIX outputs.
+**Release mode.** Both extension csproj files `dotnet publish` the server as a self-contained exe and package it into their respective VSIX outputs.
 
 #### VS 2022 Extension
 
@@ -163,9 +163,9 @@ cd src/PrinciPal.VsCodeExtension
 npm install && npm run compile    # or: dotnet build
 ```
 
-Open the `src/PrinciPal.VsCodeExtension` folder in VS Code and press **F5** → launches an Extension Development Host with the extension loaded. Start any debug session in that window to trigger the extension.
+Open the `src/PrinciPal.VsCodeExtension` folder in VS Code and press **F5** to launch an Extension Development Host with the extension loaded. Start any debug session in that window to trigger the extension.
 
-Both extensions share port 9229 and coordinate via a lock file — whichever starts first launches the server, the other reuses it.
+Both extensions share port 9229 and coordinate via a lock file. Whichever starts first launches the server; the other reuses it.
 
 #### Running TS Tests
 
