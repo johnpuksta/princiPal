@@ -1,7 +1,9 @@
 <Project Sdk="Microsoft.Build.NoTargets/3.7.56">
   <PropertyGroup>
     <TargetFramework>net8.0</TargetFramework>
-    <IsTestProject>true</IsTestProject>
+    <!-- False so dotnet test won't run VSTest against this Node-only project.
+         JS tests run via the NpmTest target during build and via CI workflow steps. -->
+    <IsTestProject>false</IsTestProject>
   </PropertyGroup>
   <Target Name="NpmInstall" BeforeTargets="Build">
     <Exec Command="npm install" WorkingDirectory="$(MSBuildProjectDirectory)" />
