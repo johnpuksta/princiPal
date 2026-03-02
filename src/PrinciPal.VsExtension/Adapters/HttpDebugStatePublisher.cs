@@ -29,6 +29,8 @@ namespace PrinciPal.VsExtension.Adapters
         private readonly int _retryBaseDelayMs;
         private readonly int _heartbeatIntervalMs;
         private readonly Timer _heartbeatTimer;
+        private readonly object _heartbeatLock = new object();
+        private volatile bool _heartbeatStopped;
 
         public HttpDebugStatePublisher(int port, string sessionId, string sessionName, string solutionPath)
             : this(port, sessionId, sessionName, solutionPath, handler: null)
@@ -50,18 +52,31 @@ namespace PrinciPal.VsExtension.Adapters
                 WriteIndented = false
             };
             _heartbeatIntervalMs = heartbeatIntervalMs;
-            _heartbeatTimer = new Timer(_ => { _ = RegisterSessionAsync(); });
+            _heartbeatTimer = new Timer(_ =>
+            {
+                lock (_heartbeatLock)
+                {
+                    if (_heartbeatStopped) return;
+                    _ = RegisterSessionAsync();
+                }
+            });
         }
 
         public void StartHeartbeat()
         {
             if (_heartbeatIntervalMs <= 0)
                 return;
+            _heartbeatStopped = false;
             _heartbeatTimer.Change(_heartbeatIntervalMs, _heartbeatIntervalMs);
         }
+
         public void StopHeartbeat()
         {
-            _heartbeatTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            lock (_heartbeatLock)
+            {
+                _heartbeatStopped = true;
+                _heartbeatTimer.Change(Timeout.Infinite, Timeout.Infinite);
+            }
         }
 
         public Task<Result> RegisterSessionAsync()
